@@ -1,12 +1,33 @@
 /*
- OpenBarbell V1.0 - the worlds first open source velocity measuring device
+
+
+     OOOOOOOOO     BBBBBBBBBBBBBBBBB   VVVVVVVV           VVVVVVVV 222222222222222    
+   OO:::::::::OO   B::::::::::::::::B  V::::::V           V::::::V2:::::::::::::::22  
+ OO:::::::::::::OO B::::::BBBBBB:::::B V::::::V           V::::::V2::::::222222:::::2 
+O:::::::OOO:::::::OBB:::::B     B:::::BV::::::V           V::::::V2222222     2:::::2 
+O::::::O   O::::::O  B::::B     B:::::B V:::::V           V:::::V             2:::::2 
+O:::::O     O:::::O  B::::B     B:::::B  V:::::V         V:::::V              2:::::2 
+O:::::O     O:::::O  B::::BBBBBB:::::B    V:::::V       V:::::V            2222::::2  
+O:::::O     O:::::O  B:::::::::::::BB      V:::::V     V:::::V        22222::::::22   
+O:::::O     O:::::O  B::::BBBBBB:::::B      V:::::V   V:::::V       22::::::::222     
+O:::::O     O:::::O  B::::B     B:::::B      V:::::V V:::::V       2:::::22222        
+O:::::O     O:::::O  B::::B     B:::::B       V:::::V:::::V       2:::::2             
+O::::::O   O::::::O  B::::B     B:::::B        V:::::::::V        2:::::2             
+O:::::::OOO:::::::OBB:::::BBBBBB::::::B         V:::::::V         2:::::2       222222
+ OO:::::::::::::OO B:::::::::::::::::B           V:::::V          2::::::2222222:::::2
+   OO:::::::::OO   B::::::::::::::::B             V:::V           2::::::::::::::::::2
+     OOOOOOOOO     BBBBBBBBBBBBBBBBB               VVV            22222222222222222222
+
+
+
+ OpenBarbell V2.0 - the sucessor to the the world's first open source velocity measuring device
  
  This code utilizes an RFduino and an HLC2705 quatrature encoder chip to
  read the position of a retractable string attached to a barbell. 
  
  You can see squatsandscience.com/openbarbell for more information.
  
- Copyright (c) 2015 squatsandscience.com.  All right reserved.
+ Copyright (c) 2015-2016 squatsandscience.com.  All right reserved.
  This code is free software; you can redistribute it and/or
  modify it under the terms of the Creative Commons 
  Attribution-NonCommercial-ShareAlike 4.0 International Public License.
@@ -29,6 +50,31 @@
  Elliot Noma
  Squats & Science Labs, LLC
  */
+ 
+ /* http://www.patorjk.com/software/taag/#p=display&h=0&v=0&f=ANSI%20Shadow&t=*%20W%20A%20R%20N%20I%20N%20G%20*
+ 
+	          ██╗    ██╗     █████╗     ██████╗     ███╗   ██╗    ██╗    ███╗   ██╗     ██████╗           
+	▄ ██╗▄    ██║    ██║    ██╔══██╗    ██╔══██╗    ████╗  ██║    ██║    ████╗  ██║    ██╔════╝     ▄ ██╗▄
+	 ████╗    ██║ █╗ ██║    ███████║    ██████╔╝    ██╔██╗ ██║    ██║    ██╔██╗ ██║    ██║  ███╗     ████╗
+	▀╚██╔▀    ██║███╗██║    ██╔══██║    ██╔══██╗    ██║╚██╗██║    ██║    ██║╚██╗██║    ██║   ██║    ▀╚██╔▀
+	  ╚═╝     ╚███╔███╔╝    ██║  ██║    ██║  ██║    ██║ ╚████║    ██║    ██║ ╚████║    ╚██████╔╝      ╚═╝ 
+	           ╚══╝╚══╝     ╚═╝  ╚═╝    ╚═╝  ╚═╝    ╚═╝  ╚═══╝    ╚═╝    ╚═╝  ╚═══╝     ╚═════╝           
+ 
+ ██████╗ ██████╗ ███████╗      ██████╗ ██████╗  ██████╗ ██████╗ ██╗   ██╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗
+██╔══██╗██╔══██╗██╔════╝      ██╔══██╗██╔══██╗██╔═══██╗██╔══██╗██║   ██║██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║
+██████╔╝██████╔╝█████╗  █████╗██████╔╝██████╔╝██║   ██║██║  ██║██║   ██║██║        ██║   ██║██║   ██║██╔██╗ ██║
+██╔═══╝ ██╔══██╗██╔══╝  ╚════╝██╔═══╝ ██╔══██╗██║   ██║██║  ██║██║   ██║██║        ██║   ██║██║   ██║██║╚██╗██║
+██║     ██║  ██║███████╗      ██║     ██║  ██║╚██████╔╝██████╔╝╚██████╔╝╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║
+╚═╝     ╚═╝  ╚═╝╚══════╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═════╝  ╚═════╝  ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+
+					 ██████╗ ██████╗ ██████╗ ███████╗
+					██╔════╝██╔═══██╗██╔══██╗██╔════╝
+					██║     ██║   ██║██║  ██║█████╗  
+					██║     ██║   ██║██║  ██║██╔══╝  
+					╚██████╗╚██████╔╝██████╔╝███████╗
+ 					╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+
+*/
 
 #include <SPI.h>
 #include <Wire.h>
@@ -52,15 +98,15 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 /***********START DEVICE SPECIFIC INFO ***************/
 
-const char *device_name = "OB 104";
+const char *device_name = "OB 2080";
 const long ticLength = 2667;	//AUTO GENERATED
-const int unit_number = 104;
+const int unit_number = 2080;
 
 
 /***********END DEVICE SPECIFIC INFO ***************/
 
 
-float CODE_VERSION = 1.08;
+float CODE_VERSION = 2.00;
 
 //START TestBed Section - Do not modify
 const bool testbed_readouts = 0;
@@ -240,17 +286,19 @@ void setup() {
   //Welcome Screen - Custom Screen requires custom libraries
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(68,5);
-  display.println("Open");
+  display.setCursor(72,9);
+  display.println("OBV2");
   display.setTextSize(1);
-  display.setCursor(68,21);
-  display.println("Barbell");
-  display.setTextSize(1);
-  display.setCursor(68,32);
-  display.print("Rev:");
+  display.setCursor(70,36);
+  display.print("Unit ");
+  display.print(unit_number);
+  
+  display.setCursor(70,46);
+  display.print("Rev ");
   display.print(CODE_VERSION);
   display.display();
-  RFduino_ULPDelay(2000);
+  
+  RFduino_ULPDelay(2500);
   
   //initial check of the battery charge
   charge = fuelGauge.stateOfCharge();
@@ -506,11 +554,19 @@ void RFduinoBLE_onConnect(){
 	RFduino_ULPDelay(200);
 	display.clearDisplay();
 	display.setTextSize(2);
-    display.setCursor(0,0);
-	display.print("BLUETOOTH");
-	display.setCursor(0,32);
-	display.print("CONNECTED");
+    display.setCursor(10,0);
+		display.print("Unit ");
+	 display.print(unit_number);
+	 display.setTextSize(2);
+	
+	display.setCursor(10,22);
+	display.print("Bluetooth");
+
+	
+		display.setCursor(10,42);
+	display.print("Connected");
 	display.display();
+	
 	//display.startscrollleft(0x00, 0x0F);
 	RFduino_ULPDelay(SECONDS(2));
 	//repDisplay = repDone+1 forces the screen to update at the end of the rep array
@@ -1125,6 +1181,3 @@ void buttonStateCalc(){
 }
 
 // ***************************************************************************** \\
-
-0
-Looking
