@@ -684,15 +684,8 @@ void RFduinoBLE_onReceive(char *data, int len)
 	
 	if(bitRead(data[0],7)){ //requires 80 XX from device
 		data_holder = min(1,(int)(data[1]));
-		if(data_holder>100){
-			data_holder=data_holder*200;
-		} 
-		max_tick_time_allowable=4294967294/data_holder;
-		
-		if(data_holder==255){
-		max_tick_time_allowable=0;
-		}
-		
+		data_holder=data_holder*3500;
+		max_tick_time_allowable=4294967294/data_holder;	
 	}
 		
   }
