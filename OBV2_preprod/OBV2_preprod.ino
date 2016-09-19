@@ -218,6 +218,8 @@ bool flippedDirection = false;
 bool normalDirection = false;
 bool BTRefresh = false;
 
+bool COMPRESSION_enabled = 1;	//THIS MUST BE ENABLED (1) FOR PRODUCTION CODE - ONLY DISABLE (0) FOR TESTING PURPOSES!
+
 int ticDiffprecision = 10;
 
 /***** Filter variables *****/
@@ -663,6 +665,10 @@ void RFduinoBLE_onReceive(char *data, int len)
 				repDisplay -= 1;
 			}
 		}
+		
+		if (data_holder=255){
+			COMPRESSION_enabled =! COMPRESSION_enabled;
+		}
 	}
 	
 	if(bitRead(data[0],6)){ //requires 40 from device
@@ -751,18 +757,30 @@ void send_float_from_intList(uint16_t *intList, uint16_t len) {
  
  //analogWrite(pin_led,10);
  
- for(int i=precisionCounter; i<(len-precisionCounter); i=i+(2*precisionCounter)){
-	if((intList[i]-10000)<0 && (intList[i+precisionCounter]-10000)<0){	//Check to see if there will be a value that may be truncated
-		while (!RFduinoBLE.sendFloat((float)intList[i]+(float)intList[i+precisionCounter]/10000));
-	} else {	//If there is a potential for truncation then each number will be sent separate
+ if (COMPRESSION_enabled){
+ 
+		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(2*precisionCounter)){
+			if((intList[i]-10000)<0 && (intList[i+precisionCounter]-10000)<0){	//Check to see if there will be a value that may be truncated
+				while (!RFduinoBLE.sendFloat((float)intList[i]+(float)intList[i+precisionCounter]/10000));
+			} else {	//If there is a potential for truncation then each number will be sent separate
+				while (!RFduinoBLE.sendFloat((float)intList[i]));
+				while (!RFduinoBLE.sendFloat((float)intList[i+precisionCounter]));
+			}
+		}
+	
+		if(len%precisionCounter==1){	//Check if there was an odd number of values
+			while(!RFduinoBLE.sendFloat((float)intList[len]));
+		}
+  
+	} else if (COMPRESSION_enabled==0){//THIS SECTION SHOULD ONLY BE ENABLED FOR NO COMPRESSION!
+  
+		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(precisionCounter)){
 		while (!RFduinoBLE.sendFloat((float)intList[i]));
-		while (!RFduinoBLE.sendFloat((float)intList[i+precisionCounter]));
-	}
+		}
+  
   }
   
-  if(len%precisionCounter==1){	//Check if there was an odd number of values
-	while(!RFduinoBLE.sendFloat((float)intList[len]));
-  }
+  
   
   //digitalWrite(pin_led,LOW);
   
