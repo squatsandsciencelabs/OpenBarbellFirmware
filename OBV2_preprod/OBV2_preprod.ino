@@ -98,9 +98,9 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 /***********START DEVICE SPECIFIC INFO ***************/
 
-const char *device_name = "OB 2080";
+const char *device_name = "OB 9999";
 const long ticLength = 2667;	//AUTO GENERATED
-const int unit_number = 2080;
+const int unit_number = 9999;
 
 
 /***********END DEVICE SPECIFIC INFO ***************/
@@ -651,6 +651,7 @@ void RFduinoBLE_onReceive(char *data, int len)
 	if(bitRead(data[0],4)){ //requires 10 from device
 		backlightTime = data[1]*1000;
 		}
+		
 	if(bitRead(data[0],5)){ //requires 20 from device
 		data_holder = (int)(data[1]);
 		if(data_holder<10){
@@ -678,14 +679,19 @@ void RFduinoBLE_onReceive(char *data, int len)
 		send_single_float(charge);	
 		
 		send_single_float(unit_number);
+	
 	}
 	
 	
 	
 	if(bitRead(data[0],7)){ //requires 80 XX from device
-		data_holder = min(1,(int)(data[1]));
-		data_holder=data_holder*3500;
-		max_tick_time_allowable=4294967294/data_holder;	
+		
+		//long max_tick_time_holder = 1;
+	
+		//max_tick_time_holder = max(1,(long)(data[1]));
+		//max_tick_time_holder = max_tick_time_holder*3500;
+		//max_tick_time_allowable = 4294967294/max_tick_time_holder;	
+		
 	}
 		
   }
