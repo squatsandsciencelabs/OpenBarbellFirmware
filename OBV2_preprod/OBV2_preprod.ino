@@ -218,7 +218,8 @@ bool flippedDirection = false;
 bool normalDirection = false;
 bool BTRefresh = false;
 
-bool COMPRESSION_enabled = 1;	//THIS MUST BE ENABLED (1) FOR PRODUCTION CODE - ONLY DISABLE (0) FOR TESTING PURPOSES!
+bool dataCOMPRESSION_enabled = 1;	//THIS MUST BE ENABLED (1) FOR PRODUCTION CODE - ONLY DISABLE (0) FOR TESTING PURPOSES!
+bool full_data_logging_enabled = 0;
 
 int ticDiffprecision = 10;
 
@@ -666,8 +667,31 @@ void RFduinoBLE_onReceive(char *data, int len)
 			}
 		}
 		
+		if (data_holder=254){
+			dataCOMPRESSION_enabled =! dataCOMPRESSION_enabled;
+		}
 		if (data_holder=255){
-			COMPRESSION_enabled =! COMPRESSION_enabled;
+			full_data_logging_enabled = 1;
+		
+			precisionCounter = 1;
+			dataCOMPRESSION_enabled =0;
+			ticDiffprecision=1;
+			
+			display.clearDisplay();
+			display.setTextSize(2);
+			display.setCursor(13,0);
+			display.print("FULL DATA");
+			
+			display.setTextSize(2);
+	
+			display.setCursor(24,22);
+			display.print("LOGGING");
+
+		
+			display.setCursor(24,42);
+			display.print("ENABLED");
+			display.display();
+			
 		}
 	}
 	
@@ -757,7 +781,7 @@ void send_float_from_intList(uint16_t *intList, uint16_t len) {
  
  //analogWrite(pin_led,10);
  
- if (COMPRESSION_enabled){
+ if (dataCOMPRESSION_enabled){
  
 		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(2*precisionCounter)){
 			if((intList[i]-10000)<0 && (intList[i+precisionCounter]-10000)<0){	//Check to see if there will be a value that may be truncated
@@ -772,10 +796,32 @@ void send_float_from_intList(uint16_t *intList, uint16_t len) {
 			while(!RFduinoBLE.sendFloat((float)intList[len]));
 		}
   
-	} else if (COMPRESSION_enabled==0){//THIS SECTION SHOULD ONLY BE ENABLED FOR NO COMPRESSION!
+	} else if (dataCOMPRESSION_enabled==0){//THIS SECTION SHOULD ONLY BE ENABLED FOR NO COMPRESSION!
+  
+		if (full_data_logging_enabled){
+		
+			display.setTextSize(3);
+			display.setCursor(110,14);
+			display.print("!");
+			display.display();
+		
+		}
   
 		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(precisionCounter)){
-		while (!RFduinoBLE.sendFloat((float)intList[i]));
+			while (!RFduinoBLE.sendFloat((float)intList[i]));
+		}
+		
+		if (full_data_logging_enabled){
+		
+			display.clearDisplay();
+			display.setTextSize(2);
+			display.setCursor(10,0);
+			display.print("DATA SENT");
+		
+			display.setCursor(10,42);
+			display.print("--READY--");
+			display.display();
+		
 		}
   
   }
