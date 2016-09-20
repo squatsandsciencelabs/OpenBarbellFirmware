@@ -223,6 +223,21 @@ bool BTRefresh = false;
 bool dataCOMPRESSION_enabled = 1;	//THIS MUST BE ENABLED (1) FOR PRODUCTION CODE - ONLY DISABLE (0) FOR TESTING PURPOSES!
 bool full_data_logging_enabled = 0;
 
+
+		//start moving average ints
+	//uint16_t myDTs[myDTCounter_size] = {0};
+	
+		const int moving_average_size = 10;
+		int moving_average_offset = 3;
+		unsigned long moving_average_holder = 0;
+		unsigned long moving_average_vector[moving_average_size] = {0};
+		float one_over_moving_average_size = 1/(float)moving_average_size;
+		
+		float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
+		
+		//end moving average inits
+
+
 int ticDiffprecision = 10;
 
 /***** Filter variables *****/
@@ -917,52 +932,83 @@ void calcRep(bool isGoingUpward, int currentState){
       
 	  //displacement = counter_simplelengthbytic*ticLength;
 	  
-	  micros_holder = micros();
+		micros_holder = micros();
 	  
 	  
 	  // There was a bug found where it was possible to start going up but then hold a position without going down...this caused the total_time to
 	  // continually increase and throw off the average velocity for the rep - to compensate for this we see how much time someone is waiting and
 	  // subtract that from the total_time
 	  
-	  if((micros_holder-tic_timestamp)>max_tick_time_allowable){
-		time_waiting = time_waiting + micros_holder-tic_timestamp;
-	  }
+		if((micros_holder-tic_timestamp)>max_tick_time_allowable){
+			time_waiting = time_waiting + micros_holder-tic_timestamp;
+		}
 	  
-      tic_timestampLast2 = tic_timestampLast;
-      tic_timestampLast = tic_timestamp;
-      tic_timestamp = micros_holder;
+		tic_timestampLast2 = tic_timestampLast;
+		tic_timestampLast = tic_timestamp;
+		tic_timestamp = micros_holder;
 
       
-      // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
-      if (!isGoingUpwardLast){
-        memset(myDTs,0,sizeof(myDTs));
-		memset(FILTER_out,0,sizeof(FILTER_out));
-        //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
-		
-		time_waiting=0;
-        counter_simplelengthbytic=0;
-		
-        starttime = tic_timestamp;
-		send_floatList(startMessage, 1);
-        rep += 1;
+		  // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
+		if (!isGoingUpwardLast){
+			memset(myDTs,0,sizeof(myDTs));
+			memset(FILTER_out,0,sizeof(FILTER_out));
+			memset(moving_average_vector,0,sizeof(moving_average_vector));
+			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 
-		currentInstVel = 0;
-		lastInstVel = 0;
-		peak_vel_at = 0;
-        minDT = 1000000;
-		myDTCounter = 0;
-      }
-	  //keeping instantaneous velocities for our peak velocity reading
-      //instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
-      ticDiff = tic_timestamp - tic_timestamp_last;
-	  tic_timestamp_last = tic_timestamp;
-	  filterOneLowpass.input( ticDiff );
-	  ticDiffFiltered = filterOneLowpass.output();
-		
-		if (ticDiffFiltered < minDT){
-			minDT=ticDiffFiltered;
-			peak_vel_at=myDTCounter;
+			time_waiting=0;
+			counter_simplelengthbytic=0;
+
+			starttime = tic_timestamp;
+			send_floatList(startMessage, 1);
+			rep += 1;
+
+			currentInstVel = 0;
+			lastInstVel = 0;
+			peak_vel_at = 0;
+			minDT = 1000000;
+			myDTCounter = 0;
 		}
+		  
+		//keeping instantaneous velocities for our peak velocity reading
+		//instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
+		ticDiff = tic_timestamp - tic_timestamp_last;
+		tic_timestamp_last = tic_timestamp;
+		 
+		//shift values into average at first
+		
+		for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){
+				moving_average_vector[shift_i]=moving_average_vector[shift_i+1];
+			}
+	
+		moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
+		
+		//Start moving average
+		  
+		if( myDTCounter >= moving_average_size)	{
+		//Shift all the values back one position
+			
+			moving_average_holder = 0;
+	
+			
+			for (int move_i=1; move_i <= (moving_average_size); move_i ++){
+				moving_average_holder = moving_average_holder + moving_average_vector[moving_average_size-move_i];
+			}
+			
+			ticDiffFiltered = moving_average_holder;
+			//ticDiffFiltered = moving_average_vector[moving_average_size];//moving_average_vector[moving_average_size-1];
+			
+			if (ticDiffFiltered < minDT){
+				minDT=ticDiffFiltered;
+				peak_vel_at=myDTCounter;
+			}
+		}
+	  
+	  	  
+	  
+		//filterOneLowpass.input( ticDiff );
+		//ticDiffFiltered = filterOneLowpass.output();
+		
+
 		
 		if(!(myDTCounter%precisionCounter)){
 		//precisionCounter = myDTCounter/(highPrecisionMode+1);
@@ -973,7 +1019,7 @@ void calcRep(bool isGoingUpward, int currentState){
 		}
 
 	  
-	  myDTCounter++;
+		myDTCounter++;
 	  
 	  
 	  
@@ -1173,6 +1219,8 @@ void buttonStateCalc(){
       memset(peakVelocity,0,sizeof(peakVelocity));
 	  //FOR TESTING
 	  memset(FILTER_out,0,sizeof(FILTER_out));
+	  memset(moving_average_vector,0,sizeof(moving_average_vector));
+	  
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
       myDTCounter = 0;
     } else {
