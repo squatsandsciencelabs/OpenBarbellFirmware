@@ -160,8 +160,10 @@ unsigned long ticDiffFiltered = 0;
 unsigned long backlightTime = 10000;
 
 //1200 Dts will give 1200*~2.68 mm = 3.2 m = 10.5 ft
-const int myDTCounter_size = 1200;
+const int myDTCounter_size = 400;
 uint16_t myDTs[myDTCounter_size] = {0};
+uint16_t FILTER_out[myDTCounter_size] = {0};
+
 const int repArrayCount=100;
 float repArray[repArrayCount] = {0.0};
 float peakVelocity[repArrayCount] = {0.0};
@@ -855,6 +857,12 @@ void send_all_data() {
 	  send_single_float(ticDiffprecision);
 	  send_single_float(-9876.0);
 	  send_float_from_intList(myDTs, myDTCounter);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_float_from_intList(FILTER_out, myDTCounter);
 	  send_single_float(-6789.0);
 	  send_single_float((float)charge);
 	  sendData = false;
@@ -928,6 +936,7 @@ void calcRep(bool isGoingUpward, int currentState){
       // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
       if (!isGoingUpwardLast){
         memset(myDTs,0,sizeof(myDTs));
+		memset(FILTER_out,0,sizeof(FILTER_out));
         //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 		
 		time_waiting=0;
@@ -949,6 +958,7 @@ void calcRep(bool isGoingUpward, int currentState){
 	  tic_timestamp_last = tic_timestamp;
 	  filterOneLowpass.input( ticDiff );
 	  ticDiffFiltered = filterOneLowpass.output();
+		
 		if (ticDiffFiltered < minDT){
 			minDT=ticDiffFiltered;
 			peak_vel_at=myDTCounter;
@@ -958,6 +968,7 @@ void calcRep(bool isGoingUpward, int currentState){
 		//precisionCounter = myDTCounter/(highPrecisionMode+1);
 		  if(myDTCounter<myDTCounter_size){
 			myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
+			FILTER_out[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
 		  }
 		}
 
@@ -1160,6 +1171,8 @@ void buttonStateCalc(){
       memset(dispArray,0,sizeof(dispArray));
       memset(timeArray,0,sizeof(timeArray));
       memset(peakVelocity,0,sizeof(peakVelocity));
+	  //FOR TESTING
+	  memset(FILTER_out,0,sizeof(FILTER_out));
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
       myDTCounter = 0;
     } else {
