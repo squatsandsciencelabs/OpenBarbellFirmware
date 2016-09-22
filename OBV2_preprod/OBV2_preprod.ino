@@ -160,9 +160,9 @@ unsigned long ticDiffFiltered = 0;
 unsigned long backlightTime = 10000;
 
 //1200 Dts will give 1200*~2.68 mm = 3.2 m = 10.5 ft
-const int myDTCounter_size = 400;
+const int myDTCounter_size = 1100;
 uint16_t myDTs[myDTCounter_size] = {0};
-uint16_t FILTER_out[myDTCounter_size] = {0};
+//uint16_t FILTER_out[myDTCounter_size] = {0};
 
 const int repArrayCount=100;
 float repArray[repArrayCount] = {0.0};
@@ -225,9 +225,10 @@ bool full_data_logging_enabled = 0;
 
 
 		//start moving average ints
-	//uint16_t myDTs[myDTCounter_size] = {0};
+		
+		int Filtration_Output = 1;
 	
-		const int moving_average_size = 10;
+		const int moving_average_size = 16;
 		int moving_average_offset = 3;
 		unsigned long moving_average_holder = 0;
 		unsigned long moving_average_vector[moving_average_size] = {0};
@@ -684,6 +685,26 @@ void RFduinoBLE_onReceive(char *data, int len)
 			}
 		}
 		
+		if (data_holder=253){
+			Filtration_Output = 0;
+			
+			display.clearDisplay();
+			display.setTextSize(2);
+			display.setCursor(13,0);
+			display.print("RAW VALUE");
+			
+			display.setTextSize(2);
+	
+			display.setCursor(28,22);
+			display.print("OUTPUT");
+
+		
+			display.setCursor(24,42);
+			display.print("ENABLED");
+			display.display();
+			
+		}
+		
 		if (data_holder=254){
 			dataCOMPRESSION_enabled =! dataCOMPRESSION_enabled;
 		}
@@ -872,12 +893,14 @@ void send_all_data() {
 	  send_single_float(ticDiffprecision);
 	  send_single_float(-9876.0);
 	  send_float_from_intList(myDTs, myDTCounter);
-	  send_single_float(-2222.0);
+	 /*
+	 send_single_float(-2222.0);
 	  send_single_float(-2222.0);
 	  send_single_float(-2222.0);
 	  send_single_float(-2222.0);
 	  send_single_float(-2222.0);
 	  send_float_from_intList(FILTER_out, myDTCounter);
+	  */
 	  send_single_float(-6789.0);
 	  send_single_float((float)charge);
 	  sendData = false;
@@ -951,7 +974,8 @@ void calcRep(bool isGoingUpward, int currentState){
 		  // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
 		if (!isGoingUpwardLast){
 			memset(myDTs,0,sizeof(myDTs));
-			memset(FILTER_out,0,sizeof(FILTER_out));
+			moving_average_holder = 0;
+			//memset(FILTER_out,0,sizeof(FILTER_out));
 			memset(moving_average_vector,0,sizeof(moving_average_vector));
 			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 
@@ -983,13 +1007,24 @@ void calcRep(bool isGoingUpward, int currentState){
 		moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
 		
 		//Start moving average
-		  
-		if( myDTCounter >= moving_average_size)	{
+		
+		
+		//Until the actual moving average can kick in used a two piece average
+		if(myDTCounter< moving_average_size){
+			
+			moving_average_holder = moving_average_holder + ticDiff;
+			
+			if(myDTCounter>1){
+				moving_average_holder=(moving_average_holder/2);
+			}
+			
+			ticDiffFiltered = moving_average_holder;
+			
+		} else if ( myDTCounter >= moving_average_size)	{
 		//Shift all the values back one position
 			
 			moving_average_holder = 0;
-	
-			
+				
 			for (int move_i=1; move_i <= (moving_average_size); move_i ++){
 				moving_average_holder = moving_average_holder + moving_average_vector[moving_average_size-move_i];
 			}
@@ -1012,10 +1047,14 @@ void calcRep(bool isGoingUpward, int currentState){
 		
 		if(!(myDTCounter%precisionCounter)){
 		//precisionCounter = myDTCounter/(highPrecisionMode+1);
-		  if(myDTCounter<myDTCounter_size){
-			myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
-			FILTER_out[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
-		  }
+			if(myDTCounter<myDTCounter_size){
+
+				//if(Filtration_Output==0){
+					myDTs[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
+				//} else if (Filtration_Output==0){
+				//	myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
+				//}
+			}
 		}
 
 	  
@@ -1218,8 +1257,9 @@ void buttonStateCalc(){
       memset(timeArray,0,sizeof(timeArray));
       memset(peakVelocity,0,sizeof(peakVelocity));
 	  //FOR TESTING
-	  memset(FILTER_out,0,sizeof(FILTER_out));
+	  //memset(FILTER_out,0,sizeof(FILTER_out));
 	  memset(moving_average_vector,0,sizeof(moving_average_vector));
+		moving_average_holder = 0;
 	  
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
       myDTCounter = 0;
