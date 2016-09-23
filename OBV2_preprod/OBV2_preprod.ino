@@ -976,7 +976,7 @@ void calcRep(bool isGoingUpward, int currentState){
 			memset(myDTs,0,sizeof(myDTs));
 			moving_average_holder = 0;
 			//memset(FILTER_out,0,sizeof(FILTER_out));
-			memset(moving_average_vector,15000,sizeof(moving_average_vector));
+			memset(moving_average_vector,0,sizeof(moving_average_vector));
 			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 
 			time_waiting=0;
@@ -1255,7 +1255,7 @@ void buttonStateCalc(){
       memset(peakVelocity,0,sizeof(peakVelocity));
 	  //FOR TESTING
 	  //memset(FILTER_out,0,sizeof(FILTER_out));
-	  memset(moving_average_vector,15000,sizeof(moving_average_vector));
+	  memset(moving_average_vector,0,sizeof(moving_average_vector));
 		moving_average_holder = 0;
 	  
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
