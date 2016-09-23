@@ -106,7 +106,7 @@ const int unit_number = 9999;
 /***********END DEVICE SPECIFIC INFO ***************/
 
 
-float CODE_VERSION = 2.00;
+float CODE_VERSION = 9.99;
 
 //START TestBed Section - Do not modify
 const bool testbed_readouts = 0;
@@ -231,7 +231,7 @@ bool full_data_logging_enabled = 0;
 		const int moving_average_size = 16;
 		int moving_average_offset = 3;
 		unsigned long moving_average_holder = 0;
-		unsigned long moving_average_vector[moving_average_size] = {0};
+		unsigned long moving_average_vector[moving_average_size] = {15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000};
 		float one_over_moving_average_size = 1/(float)moving_average_size;
 		
 		float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
@@ -976,7 +976,7 @@ void calcRep(bool isGoingUpward, int currentState){
 			memset(myDTs,0,sizeof(myDTs));
 			moving_average_holder = 0;
 			//memset(FILTER_out,0,sizeof(FILTER_out));
-			memset(moving_average_vector,0,sizeof(moving_average_vector));
+			memset(moving_average_vector,15000,sizeof(moving_average_vector));
 			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 
 			time_waiting=0;
@@ -997,21 +997,39 @@ void calcRep(bool isGoingUpward, int currentState){
 		//instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
 		ticDiff = tic_timestamp - tic_timestamp_last;
 		tic_timestamp_last = tic_timestamp;
-		 
-		//shift values into average at first
-		
-		for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){
-				moving_average_vector[shift_i]=moving_average_vector[shift_i+1];
-			}
-	
-		moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
 		
 		//Start moving average
+
 		
+		//shift values into average at first
 		
-		//Until the actual moving average can kick in used a two piece average
-		if(myDTCounter< moving_average_size){
+			for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){
+					moving_average_vector[shift_i]=moving_average_vector[shift_i+1];
+				}
+		
+			moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
 			
+			if(myDTCounter>=(moving_average_size)){
+			
+				moving_average_holder = 0;
+				
+				for(int i=0; i <= (moving_average_size - 1); i++){
+					
+					moving_average_holder=moving_average_holder+moving_average_vector[i];
+				}
+				
+				ticDiffFiltered = moving_average_holder;
+
+
+				//end moving average
+				
+				if (ticDiffFiltered < minDT){
+					minDT=ticDiffFiltered;
+					peak_vel_at=myDTCounter;
+				}	
+			} else {
+			
+			/*
 			moving_average_holder = moving_average_holder + ticDiff;
 			
 			if(myDTCounter>1){
@@ -1019,43 +1037,22 @@ void calcRep(bool isGoingUpward, int currentState){
 			}
 			
 			ticDiffFiltered = moving_average_holder;
-			
-		} else if ( myDTCounter >= moving_average_size)	{
-		//Shift all the values back one position
-			
-			moving_average_holder = 0;
+			*/	
 				
-			for (int move_i=1; move_i <= (moving_average_size); move_i ++){
-				moving_average_holder = moving_average_holder + moving_average_vector[moving_average_size-move_i];
+			ticDiffFiltered = 0;
 			}
 			
-			ticDiffFiltered = moving_average_holder;
-			//ticDiffFiltered = moving_average_vector[moving_average_size];//moving_average_vector[moving_average_size-1];
-			
-			if (ticDiffFiltered < minDT){
-				minDT=ticDiffFiltered;
-				peak_vel_at=myDTCounter;
-			}
-		}
-	  
-	  	  
-	  
-		//filterOneLowpass.input( ticDiff );
-		//ticDiffFiltered = filterOneLowpass.output();
-		
+			if(!(myDTCounter%precisionCounter)){
+			//precisionCounter = myDTCounter/(highPrecisionMode+1);
+				if(myDTCounter<myDTCounter_size){
 
-		
-		if(!(myDTCounter%precisionCounter)){
-		//precisionCounter = myDTCounter/(highPrecisionMode+1);
-			if(myDTCounter<myDTCounter_size){
-
-				//if(Filtration_Output==0){
-					myDTs[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
-				//} else if (Filtration_Output==0){
-				//	myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
-				//}
+					//if(Filtration_Output==0){
+						myDTs[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
+					//} else if (Filtration_Output==0){
+					//	myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
+					//}
+				}
 			}
-		}
 
 	  
 		myDTCounter++;
@@ -1258,7 +1255,7 @@ void buttonStateCalc(){
       memset(peakVelocity,0,sizeof(peakVelocity));
 	  //FOR TESTING
 	  //memset(FILTER_out,0,sizeof(FILTER_out));
-	  memset(moving_average_vector,0,sizeof(moving_average_vector));
+	  memset(moving_average_vector,15000,sizeof(moving_average_vector));
 		moving_average_holder = 0;
 	  
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
@@ -1311,7 +1308,7 @@ void buttonStateCalc(){
 		  display.setTextSize(3);
 		  display.setTextColor(WHITE,BLACK);
 		  display.setCursor(0,19);
-		  if(peakVelocity[repDisplay] > 2){
+		  if(peakVelocity[repDisplay] > 4){
 			display.print("MAX");
 		  }else {
 			  display.print(peakVelocity[repDisplay]);
