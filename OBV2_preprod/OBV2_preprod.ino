@@ -1041,13 +1041,15 @@ void calcRep(bool isGoingUpward, int currentState){
 				
 			ticDiffFiltered = 0;
 			}
+
+		 
 			
-			if(!(myDTCounter%precisionCounter)){
+			if(myDTCounter >= moving_average_size-1){
 			//precisionCounter = myDTCounter/(highPrecisionMode+1);
 				if(myDTCounter<myDTCounter_size){
 
 					//if(Filtration_Output==0){
-						myDTs[myDTCounter] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
+						myDTs[myDTCounter-moving_average_size] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
 					//} else if (Filtration_Output==0){
 					//	myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
 					//}
@@ -1081,6 +1083,9 @@ void calcRep(bool isGoingUpward, int currentState){
           minTimer2 = millis();
 		  restTime = 0;
 		  counter_simplelengthbytic=0;
+		  
+		  
+		  
 
         } else { 
           rep -= 1;
