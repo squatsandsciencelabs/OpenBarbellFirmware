@@ -1,3 +1,9 @@
+// A very big thank you to the following people!
+// Alejandro Nuñez Bernete
+// Jackie Swinehart
+// John Rudolf
+// Mark Gumtang
+
 /*
 
 
@@ -106,7 +112,7 @@ const int unit_number = 9999;
 /***********END DEVICE SPECIFIC INFO ***************/
 
 
-float CODE_VERSION = 2.00;
+float CODE_VERSION = 9.99;
 
 //START TestBed Section - Do not modify
 const bool testbed_readouts = 0;
@@ -160,8 +166,10 @@ unsigned long ticDiffFiltered = 0;
 unsigned long backlightTime = 10000;
 
 //1200 Dts will give 1200*~2.68 mm = 3.2 m = 10.5 ft
-const int myDTCounter_size = 1200;
+const int myDTCounter_size = 1100;
 uint16_t myDTs[myDTCounter_size] = {0};
+//uint16_t FILTER_out[myDTCounter_size] = {0};
+
 const int repArrayCount=100;
 float repArray[repArrayCount] = {0.0};
 float peakVelocity[repArrayCount] = {0.0};
@@ -220,6 +228,22 @@ bool BTRefresh = false;
 
 bool dataCOMPRESSION_enabled = 1;	//THIS MUST BE ENABLED (1) FOR PRODUCTION CODE - ONLY DISABLE (0) FOR TESTING PURPOSES!
 bool full_data_logging_enabled = 0;
+
+
+		//start moving average ints
+		
+		int Filtration_Output = 1;
+	
+		const int moving_average_size = 16;
+		int moving_average_offset = 3;
+		unsigned long moving_average_holder = 0;
+		unsigned long moving_average_vector[moving_average_size] = {15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000};
+		float one_over_moving_average_size = 1/(float)moving_average_size;
+		
+		float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
+		
+		//end moving average inits
+
 
 int ticDiffprecision = 10;
 
@@ -667,10 +691,28 @@ void RFduinoBLE_onReceive(char *data, int len)
 			}
 		}
 		
-		if (data_holder=254){
-			dataCOMPRESSION_enabled =! dataCOMPRESSION_enabled;
+		if (data_holder==254){
+			Filtration_Output = 0;
+			
+			display.clearDisplay();
+			display.setTextSize(2);
+			display.setCursor(13,0);
+			display.print("RAW VALUE");
+			
+			display.setTextSize(2);
+	
+			display.setCursor(28,22);
+			display.print("OUTPUT");
+
+		
+			display.setCursor(24,42);
+			display.print("ENABLED");
+			display.display();
+			
 		}
-		if (data_holder=255){
+		
+
+		if (data_holder==255){
 			full_data_logging_enabled = 1;
 		
 			precisionCounter = 1;
@@ -779,11 +821,26 @@ void send_floatList(float *floatList, int len) {
 
 void send_float_from_intList(uint16_t *intList, uint16_t len) {
  
+			
+			display.setTextSize(1);
+			display.setCursor(100,22);
+			display.print(")");
+			
+			display.setTextSize(2);
+			display.setCursor(107,18);
+			display.print(")");
+			
+			display.setTextSize(3);
+			display.setCursor(115,16);
+			display.print(")");
+			
+			display.display();
+			
  //analogWrite(pin_led,10);
  
  if (dataCOMPRESSION_enabled){
  
-		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(2*precisionCounter)){
+		for(int i=precisionCounter; i<((len-moving_average_size)-precisionCounter); i=i+(2*precisionCounter)){
 			if((intList[i]-10000)<0 && (intList[i+precisionCounter]-10000)<0){	//Check to see if there will be a value that may be truncated
 				while (!RFduinoBLE.sendFloat((float)intList[i]+(float)intList[i+precisionCounter]/10000));
 			} else {	//If there is a potential for truncation then each number will be sent separate
@@ -793,40 +850,35 @@ void send_float_from_intList(uint16_t *intList, uint16_t len) {
 		}
 	
 		if(len%precisionCounter==1){	//Check if there was an odd number of values
-			while(!RFduinoBLE.sendFloat((float)intList[len]));
+			while(!RFduinoBLE.sendFloat((float)intList[(len-moving_average_size)]));
 		}
   
-	} else if (dataCOMPRESSION_enabled==0){//THIS SECTION SHOULD ONLY BE ENABLED FOR NO COMPRESSION!
+	} else if (dataCOMPRESSION_enabled==0){
   
-		if (full_data_logging_enabled){
 		
-			display.setTextSize(3);
-			display.setCursor(110,14);
-			display.print("!");
-			display.display();
-		
-		}
   
-		for(int i=precisionCounter; i<(len-precisionCounter); i=i+(precisionCounter)){
+		for(int i=precisionCounter; i<((len-moving_average_size)-precisionCounter); i=i+(precisionCounter)){
 			while (!RFduinoBLE.sendFloat((float)intList[i]));
 		}
 		
-		if (full_data_logging_enabled){
 		
-			display.clearDisplay();
-			display.setTextSize(2);
-			display.setCursor(10,0);
-			display.print("DATA SENT");
 		
-			display.setCursor(10,42);
-			display.print("--READY--");
-			display.display();
-		
-		}
   
   }
   
-  
+  display.setTextSize(2);
+			display.setTextSize(1);
+			display.setCursor(100,22);
+			display.print(" ");
+			
+			display.setTextSize(2);
+			display.setCursor(107,18);
+			display.print(" ");
+			
+			display.setTextSize(3);
+			display.setCursor(115,16);
+			display.print(" ");
+			display.display();
   
   //digitalWrite(pin_led,LOW);
   
@@ -855,6 +907,14 @@ void send_all_data() {
 	  send_single_float(ticDiffprecision);
 	  send_single_float(-9876.0);
 	  send_float_from_intList(myDTs, myDTCounter);
+	 /*
+	 send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_single_float(-2222.0);
+	  send_float_from_intList(FILTER_out, myDTCounter);
+	  */
 	  send_single_float(-6789.0);
 	  send_single_float((float)charge);
 	  sendData = false;
@@ -909,60 +969,109 @@ void calcRep(bool isGoingUpward, int currentState){
       
 	  //displacement = counter_simplelengthbytic*ticLength;
 	  
-	  micros_holder = micros();
+		micros_holder = micros();
 	  
 	  
 	  // There was a bug found where it was possible to start going up but then hold a position without going down...this caused the total_time to
 	  // continually increase and throw off the average velocity for the rep - to compensate for this we see how much time someone is waiting and
 	  // subtract that from the total_time
 	  
-	  if((micros_holder-tic_timestamp)>max_tick_time_allowable){
-		time_waiting = time_waiting + micros_holder-tic_timestamp;
-	  }
+		if((micros_holder-tic_timestamp)>max_tick_time_allowable){
+			time_waiting = time_waiting + micros_holder-tic_timestamp;
+		}
 	  
-      tic_timestampLast2 = tic_timestampLast;
-      tic_timestampLast = tic_timestamp;
-      tic_timestamp = micros_holder;
+		tic_timestampLast2 = tic_timestampLast;
+		tic_timestampLast = tic_timestamp;
+		tic_timestamp = micros_holder;
 
       
-      // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
-      if (!isGoingUpwardLast){
-        memset(myDTs,0,sizeof(myDTs));
-        //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
-		
-		time_waiting=0;
-        counter_simplelengthbytic=0;
-		
-        starttime = tic_timestamp;
-		send_floatList(startMessage, 1);
-        rep += 1;
+		  // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
+		if (!isGoingUpwardLast){
+			memset(myDTs,0,sizeof(myDTs));
+			moving_average_holder = 0;
+			//memset(FILTER_out,0,sizeof(FILTER_out));
+			memset(moving_average_vector,0,sizeof(moving_average_vector));
+			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
 
-		currentInstVel = 0;
-		lastInstVel = 0;
-		peak_vel_at = 0;
-        minDT = 1000000;
-		myDTCounter = 0;
-      }
-	  //keeping instantaneous velocities for our peak velocity reading
-      //instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
-      ticDiff = tic_timestamp - tic_timestamp_last;
-	  tic_timestamp_last = tic_timestamp;
-	  filterOneLowpass.input( ticDiff );
-	  ticDiffFiltered = filterOneLowpass.output();
-		if (ticDiffFiltered < minDT){
-			minDT=ticDiffFiltered;
-			peak_vel_at=myDTCounter;
+			time_waiting=0;
+			counter_simplelengthbytic=0;
+
+			starttime = tic_timestamp;
+			send_floatList(startMessage, 1);
+			rep += 1;
+
+			currentInstVel = 0;
+			lastInstVel = 0;
+			peak_vel_at = 0;
+			minDT = 1000000;
+			myDTCounter = 0;
 		}
+		  
+		//keeping instantaneous velocities for our peak velocity reading
+		//instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
+		ticDiff = tic_timestamp - tic_timestamp_last;
+		tic_timestamp_last = tic_timestamp;
 		
-		if(!(myDTCounter%precisionCounter)){
-		//precisionCounter = myDTCounter/(highPrecisionMode+1);
-		  if(myDTCounter<myDTCounter_size){
-			myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
-		  }
-		}
+		//Start moving average
+
+		
+		//shift values into average at first
+		
+			for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){
+					moving_average_vector[shift_i]=moving_average_vector[shift_i+1];
+				}
+		
+			moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
+			
+			if(myDTCounter>=(moving_average_size)){
+			
+				moving_average_holder = 0;
+				
+				for(int i=0; i <= (moving_average_size - 1); i++){
+					
+					moving_average_holder=moving_average_holder+moving_average_vector[i];
+				}
+				
+				ticDiffFiltered = moving_average_holder;
+
+
+				//end moving average
+				
+				if (ticDiffFiltered < minDT){
+					minDT=ticDiffFiltered;
+					peak_vel_at=myDTCounter;
+				}	
+			} else {
+			
+			/*
+			moving_average_holder = moving_average_holder + ticDiff;
+			
+			if(myDTCounter>1){
+				moving_average_holder=(moving_average_holder/2);
+			}
+			
+			ticDiffFiltered = moving_average_holder;
+			*/	
+				
+			ticDiffFiltered = 0;
+			}
+
+		 
+			
+			if(myDTCounter >= moving_average_size-1){
+			//precisionCounter = myDTCounter/(highPrecisionMode+1);
+				if(myDTCounter<myDTCounter_size){
+
+					
+						myDTs[myDTCounter-moving_average_size] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
+					if (Filtration_Output==0){
+						myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
+					}
+				}
+			}
 
 	  
-	  myDTCounter++;
+		myDTCounter++;
 	  
 	  
 	  
@@ -988,6 +1097,9 @@ void calcRep(bool isGoingUpward, int currentState){
           minTimer2 = millis();
 		  restTime = 0;
 		  counter_simplelengthbytic=0;
+		  
+		  
+		  
 
         } else { 
           rep -= 1;
@@ -1160,6 +1272,11 @@ void buttonStateCalc(){
       memset(dispArray,0,sizeof(dispArray));
       memset(timeArray,0,sizeof(timeArray));
       memset(peakVelocity,0,sizeof(peakVelocity));
+	  //FOR TESTING
+	  //memset(FILTER_out,0,sizeof(FILTER_out));
+	  memset(moving_average_vector,0,sizeof(moving_average_vector));
+		moving_average_holder = 0;
+	  
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
       myDTCounter = 0;
     } else {
@@ -1210,7 +1327,7 @@ void buttonStateCalc(){
 		  display.setTextSize(3);
 		  display.setTextColor(WHITE,BLACK);
 		  display.setCursor(0,19);
-		  if(peakVelocity[repDisplay] > 2){
+		  if(peakVelocity[repDisplay] > 4){
 			display.print("MAX");
 		  }else {
 			  display.print(peakVelocity[repDisplay]);
