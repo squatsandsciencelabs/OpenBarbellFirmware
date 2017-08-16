@@ -363,12 +363,12 @@ void setup() {
 
 void loop() {
   
-  directionCalc();                              // 4. directionCalc()  
-  calcRep(goingUpward, state);                  // 4. directionCalc()  
-  buttonStateCalc();                            // 4. directionCalc()  
-  minuteTimer();                                // 4. directionCalc()  
-  displayOffTimer();                            // 4. directionCalc()         
-  LEDBlink();                                   // 4. directionCalc()  
+  directionCalc();                              // 4. Direction Flag   
+  calcRep(goingUpward, state);                  // 13. Rep Calculation Algorithm    
+  buttonStateCalc();                            // 14. Button Press State Configuration )  
+  minuteTimer();                                // 7. Minute Timer  
+  displayOffTimer();                            // 9. Display Timeout         
+  LEDBlink();                                   // 8. LED Updater   
   
 }
 
@@ -455,21 +455,21 @@ void olyPowerMode(){
 }
 
 //-------------------------------------------------------------------------
-//////////                7. Minute Timer                ////////////
+//////////                  7. Minute Timer                    ////////////
 //-------------------------------------------------------------------------
-//     Tracks battery charge and rest time and updates display     //
+//        Tracks battery charge and rest time and updates display        //
 //-------------------------------------------------------------------------
 
-void minuteTimer(){                                                                     //Update minute timer so that display updates when rest at a minunte    *****
+void minuteTimer(){                             //Update minute timer so that display updates when rest at a minunte    *****
   
-  if(((millis()-minTimer)%oneMinute) < 20){   //Every minute (since last rep) with .02s accuracy 
+  if(((millis()-minTimer)%oneMinute) < 20){     //Every minute (since last rep) with .02s accuracy 
   
-  	if((millis()-minTimer2)>30){              //If this function has been called within this minute, don't call it again  
+  	if((millis()-minTimer2)>30){                //If this function has been called within this minute, don't call it again  
       	
   	  minTimer2 = millis();
-  	  restTime++;                             //Rest time accumulates 
-  	  rest[repDone%repArrayCount] = restTime;            //Rest time recorded for current rep
-  	  charge = fuelGauge.stateOfCharge();     //Check battery status
+  	  restTime++;                               //Rest time accumulates 
+  	                                            //Rest time recorded for current rep
+  	  charge = fuelGauge.stateOfCharge();       //Check battery status
     	  if(charge>100){
     		charge=100;
     	  } 
@@ -494,9 +494,9 @@ void minuteTimer(){                                                             
 }
 
 //-------------------------------------------------------------------------
-//////////                8. LED Updater                     ////////////
+//////////                8. LED Updater                       ////////////
 //-------------------------------------------------------------------------
-// Function to blink LED every XX seconds, if there's nothing going on //
+// Function to blink LED every XX seconds, if there's nothing going on   //
 //-------------------------------------------------------------------------
 
 void LEDBlink(){    
@@ -837,11 +837,10 @@ void systemTrayDisplay(){
 	display.setCursor(0,0);
 	display.print("Rep#:");
 	display.print(repDisplay);
-  restTime=rest[repDisplay%repArrayCount];
 	
 	display.print("  ");
 	display.setCursor(55,0);
-	display.print(rest[repDisplay]);
+	display.print(rest[repDisplay%repArrayCount]);
 	display.print(" min");
 	display.setCursor(104,0);
 	display.print(charge);
@@ -957,36 +956,30 @@ void calcRep(bool isGoingUpward, int currentState){
   		}
   		
   		ticDiffFiltered = moving_average_holder;
-  		*/	
-  			
+  		*/	  			
   		ticDiffFiltered = 0;
-		}
-  
-  		 
+		} 		 
   			
   		if(myDTCounter >= moving_average_size-1){
   		//precisionCounter = myDTCounter/(highPrecisionMode+1);
-  			if(myDTCounter<myDTCounter_size){
-  
-  				
+  			if(myDTCounter<myDTCounter_size){  				
   					myDTs[myDTCounter-moving_average_size] = (uint16_t)(ticDiffFiltered/ticDiffprecision);  //start filling tic array with average velocities
   				if (Filtration_Output==0){
   					myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);                              //start filling tic array with unfiltered velocities
   				}
   			}
-  		}
-  
-  	  
-  		myDTCounter++;                                                                                //End of GoingUp, increase encoder tic total by 1
-  	  
-  	  
-  	  
+  		}    	  
+  		myDTCounter++;                                                                                //End of GoingUp, increase encoder tic total by 1 	  
         
     } else {
       
       // If you're going downward, and you were just going upward, you potentially just finished a rep. 
       // Do your math, check if it fits the rep criteria, and store it in an array.
-      
+
+//-------------------------------------------------------------------------
+//                            Rep Calculations                           //
+//-------------------------------------------------------------------------    
+
 	  if (isGoingUpwardLast){                                                                             //Modified for overflow reps    
     
 	  displacement = counter_simplelengthbytic*ticLength;                                                 //Total distance moved
@@ -994,18 +987,19 @@ void calcRep(bool isGoingUpward, int currentState){
     		  total_time = (tic_timestamp - starttime) - time_waiting;                                      //Calculate time since start
           
     		        peakVelocity[rep%repArrayCount] = float(ticLength)/float(minDT);		 
-  		          dispArray[rep%repArrayCount] = displacement/1000;                                                 //Update displacement array , linear mapped - is this required?         *****
-                timeArray[rep%repArrayCount] = (float)total_time/1000000;                                         //Update time array (time per rep)
-                peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;                               //Update log of peak velocity locations - useful for MPV?         *****
-    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array        
+  		          dispArray[rep%repArrayCount] = displacement/1000;                                                                 //Update displacement array 
+                timeArray[rep%repArrayCount] = (float)total_time/1000000;                                                         //Update time array (time per rep)
+                peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;                                               //Update log of peak velocity locations 
+    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array     
+                rest[rep%repArrayCount] = restTime;   
                  
-    		  repDone = rep;		                                                                            //Sets rep state flag to 1?         *****
+    		  repDone = rep;		                                                                            //Sets global rep counter to loop rep count
           minTimer = millis();                                                                          //resets 60 second rest time counter
           minTimer2 = millis();
     		  restTime = 0;
     		  counter_simplelengthbytic=0;
         } 
-        else {                                                                                      //Get rig of this rep (it doesn't count)
+        else {                                                                                      //Get rid of this rep (it doesn't count)
           rep -= 1;
         }
       }
@@ -1075,7 +1069,7 @@ void buttonStateCalc(){
                                                                                      
   if (buttonstateLtemp && !buttonstateL){                                            //Register a button press on the release of the left button 
     if ((backlightFlag)&&(repDisplay > 1)&&(repDisplay < repDone + 2)){              //If the screen is on and the current displayed rep is not the first or last
-      if(repDone>=100&&(repDisplay>=(repDone%100))){     
+      if(repDone<=100||(repDisplay>=repDone%repArrayCount)){     
         repDisplay -= 1;
       }
     } else {
@@ -1168,7 +1162,7 @@ void buttonStateCalc(){
     else if (repDisplay > (repDone + 1)){                                            //This line keeps the repDisplay value from getting too big, and causing a bug to miss the first rep (edit: might not be necessary)  *****
       counter_simplelengthbytic=0; //JDLTEST	  
 	    //repDisplay = repDone + 2;  
-      rep = (goingUpward)?(1):(0);                                                   //Yes, you can just say rep = goingUpward. But goingUpward can only be 0 or 1 and rep can be any integer. It just doesn't feel right.
+      rep = (goingUpward)?(1):(0);                                                   
       repDone = 0;
       repDoneLast = 0;
 	  
@@ -1230,7 +1224,7 @@ void buttonStateCalc(){
   		  display.setCursor(82,42);
   		  display.print("ROM:");
   		  display.setCursor(82,51);
-  		  display.print(dispArray[repDisplay%repArrayCount]);                                 //Fix overflow logic          *****
+  		  display.print(dispArray[repDisplay%repArrayCount]);                                 
   		  display.print("mm");
   
 		  	if(testbed_readouts){
