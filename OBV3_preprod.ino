@@ -93,16 +93,16 @@
 //LED Definitions
   #define NUM_LEDS 1
   #define DATA_PIN 2
-  #define LOW_POWER 10
-  #define BRIGHTNESS 30
+  #define LOW_POWER 1
+  #define BRIGHTNESS 35
   enum color {RED, GREEN, BLK, WHT};
                                                        
 
 /***********START DEVICE SPECIFIC INFO ***************/                                 
-  const char *device_name = "OB 1234";
+  const char *device_name = "OB 5555";
   const long ticLength = 2667;	
-  const int unit_number = 1234;
-  color COLOR = GREEN;
+  const int unit_number = 5555;
+  color COLOR = RED;
 /***********END DEVICE SPECIFIC INFO ***************/
 
 //Version Info
@@ -182,6 +182,7 @@
   unsigned long ticDiff = 0;
   unsigned long ticDiffFiltered = 0;
   unsigned long backlightTime = 10000;
+  unsigned long vel_last = 10000000;
   uint16_t restTime = 0;
 
 //Tick Counter Initialization
@@ -191,7 +192,7 @@
 //  uint16_t FILTER_out[myDTCounter_size] = {0};          
  
 
-//Rep Array Initializations
+//Rep Array Initializations 55555
   const int repArrayCount=100;
   float repArray[repArrayCount] = {0.0};
   float peakVelocity[repArrayCount] = {0.0};
@@ -245,7 +246,8 @@ bool accomplishedSingleHold = false;
 	const int moving_average_size = 16;
 	int moving_average_offset = 3;
 	unsigned long moving_average_holder = 0;
-  unsigned long peakAccel = 1000;
+  float peakAccel = 0;
+  unsigned long peakAccelHolder = 0;
 	unsigned long moving_average_vector[moving_average_size] = {15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000};
 	float one_over_moving_average_size = 1/(float)moving_average_size;		
 	float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
@@ -347,7 +349,10 @@ void setup() {
   charge = fuelGauge.stateOfCharge();
 	if(charge>100){
 		charge=100;
-	} else if (charge<=0){
+	} else if(charge<=20){
+    LVL=LOW_POWER;
+	}
+	else if (charge<=0){	
 		charge=1;
 	}
  
@@ -804,20 +809,41 @@ void send_single_float(float singleFloat) {
 } 
 
 void send_all_data() {
-	if (sendData) {     //only send data if you just finished recording a new rep
-	  repPerformance[0] = (float) rep;
-	  repPerformance[1] = (float) repArray[rep];
-	  repPerformance[2] = (float) dispArray[rep]; 
-	  repPerformance[3] = (float) peakVelocity[rep];
-	  repPerformance[4] = (float) peakVelLocation[rep];
+	if (sendData) {       
+	  repPerformance[0] = (float) rep;                                  //Rep #
+	  repPerformance[1] = (float) repArray[rep];                        //Avg Velocity (m/s)      
+	  repPerformance[2] = (float) dispArray[rep];                       //Range of Motion (mm)
+	  repPerformance[3] = (float) peakVelocity[rep];                    //Peak Velocity (m/s)
+	  repPerformance[4] = (float) peakVelLocation[rep];                 //Peak Velocity Location (%)
 	  send_floatList(repPerformance, 5);
-	  send_single_float(-9999.0);
-	  send_single_float(precisionCounter);
-	  send_single_float(ticDiffprecision);
-	  send_single_float(-9876.0);
-	  send_float_from_intList(myDTs, myDTCounter);
-	  send_single_float(-6789.0);
-	  send_single_float((float)charge);
+    send_single_float(peakAccel/1000000);                                     //Peak Acceleration (m/s^2)
+	  
+	  //Start OBV3 Extra Data
+    send_single_float(timeArray[rep]*100000);                         //Duration of Rep (microseconds)
+    send_single_float(restTime);                                      //Time between Reps (minutes)
+    send_single_float(tic_timestamp);                                 //Timesatamp of Rep Completion (microseconds)
+    send_single_float(time_waiting);                                  //Timestamp of time "waiting" in rep (microseconds)
+    send_single_float(max_tick_time_allowable);                       //Slowest Instantaneous Velocity Allowable (microseconds)
+    send_single_float(backlightTime);                                 //Amount of Time the Backlight is allowed to stay on (microseconds)
+    send_single_float(minRepThreshold);                               //Minimum allowable Rep Length (micrometers)
+    send_single_float(dataCOMPRESSION_enabled);                       //Is data compression enabled for Bulk Data (bool)
+    send_single_float(Filtration_Output);                             //Is filtration enabled for bulk data (bool)  
+
+    //Device Info
+    send_single_float(CODE_VERSION);                                  //Code Version 
+    send_single_float(unit_number);                                   //Unit Number
+    send_single_float((r*100)+(g*10+b));                               //LED Color (RGB)
+    send_single_float(BRIGHTNESS);                                    //Brightness (%)
+    send_single_float(LOW_POWER);                                     //Low Power Brightness (%)
+
+    //Start Bulk Data Settings Transmission)
+    send_single_float(-9999.0);                                       //Flag Bulk Data Settings
+	  send_single_float(precisionCounter);                              //# of Ticks Counted
+	  send_single_float(ticDiffprecision);                              //Precision of Compressed Values
+	  send_single_float(-9876.0);                                       //Start Bulk Data
+	  send_float_from_intList(myDTs, myDTCounter);                      //**BULK DATA** (UNKNOWN LENGTH)
+	  send_single_float(-6789.0);                                       //End Bulk Data
+	  send_single_float((float)charge);                                 //Battery Charge
 	  sendData = false;
 	  }
 } 
@@ -876,18 +902,18 @@ void calcRep(bool isGoingUpward, int currentState){
     
   		if((micros_holder-tic_timestamp)>max_tick_time_allowable){
   			time_waiting = time_waiting + micros_holder-tic_timestamp;
-                                                                      // There was a bug found where it was possible to start going up but then hold a position without going down...this caused the total_time to
-                                                                      // continually increase and throw off the average velocity for the rep - to compensate for this we see how much time someone is waiting and
-                                                                      // subtract that from the total_time
-  		 }
-       	  
+  		}
+        // There was a bug found where it was possible to start going up but then hold a 
+        // position without going down...this caused the total_time to
+        // continually increase and throw off the average velocity for the rep - to compensate 
+        // for this we see how much time someone is waiting and
+        // subtract that from the total_time  		 
+        	  
   		tic_timestampLast2 = tic_timestampLast;
   		tic_timestampLast = tic_timestamp;
   		tic_timestamp = micros_holder;   
-      if(peakAccel > tic_timestamp - tic_timestampLast2){
-        peakAccel = tic_timestamp - tic_timestampLast2;                             
-      }
-
+     
+      
 //-------------------------------------------------------------------------
 //                          Starting New Rep                             //
 //-------------------------------------------------------------------------
@@ -909,10 +935,12 @@ void calcRep(bool isGoingUpward, int currentState){
   			peak_vel_at = 0;
   			minDT = 1000000;
   			myDTCounter = 0;                                              //Zero out position data
+        peakAccel = 0;
   		}
   		  
 		//keeping instantaneous velocities for our peak velocity reading
 		//instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
+
     
 		ticDiff = tic_timestamp - tic_timestamp_last;                     //DT for this rep
 		tic_timestamp_last = tic_timestamp;                               //Base time for next rep
@@ -935,8 +963,22 @@ void calcRep(bool isGoingUpward, int currentState){
 				for(int i=0; i <= (moving_average_size - 1); i++){					
 					moving_average_holder=moving_average_holder+moving_average_vector[i];               //Add up vector to get the average velocity
 				}
-				
-				ticDiffFiltered = moving_average_holder;                                              
+
+        if(moving_average_holder<vel_last){
+          peakAccelHolder = ((ticLength/vel_last)-(ticLength/moving_average_holder))/(moving_average_holder+vel_last);
+           
+        }
+        else{
+          peakAccelHolder = 0;
+        }
+        vel_last = moving_average_holder;
+      
+       if(peakAccelHolder>peakAccel){
+          peakAccel = peakAccelHolder;
+       }
+
+       
+			 ticDiffFiltered = moving_average_holder;                                              
 				//end moving average
   				
   			if (ticDiffFiltered < minDT){                                                         //if the last tic was faster than the current lowest (minDT) 
@@ -1240,19 +1282,19 @@ void buttonStateCalc(){
   		  display.setTextSize(1);
   		  display.setTextColor(WHITE,BLACK);
   		  display.setCursor(0,9);
-  		  display.print("Peak Vel:");
+  		  display.print("Peak Accel:");
   		  display.setTextSize(3);
   		  display.setTextColor(WHITE,BLACK);
   		  display.setCursor(0,19);
-        
+        /*
     		  if(peakVelocity[repDisplay%repArrayCount] > MAXVEL){
     			  display.print("MAX");
     		  }
-    		  else {
-    			  display.print(peakVelocity[repDisplay%repArrayCount]);
+    		  else {*/
+    			  display.print(peakAccel/1000000);
     			  display.setTextSize(1);
-    			  display.print("m/s");
-    		  }
+    			  display.print("m/s^2");
+    		  //}
   		  display.setTextSize(1);
   		  display.setCursor(0,42);
   		  display.print("Time:");
