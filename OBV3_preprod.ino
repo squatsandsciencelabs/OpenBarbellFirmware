@@ -1,4 +1,3 @@
-
 // A very big thank you to the following people!
 // Alejandro Nuñez Bernete
 // Jackie Swinehart
@@ -8,14 +7,15 @@
 /*
 
 
+ --- ALL CURRENT BUGS OR BAD CODE ARE SEARCHABLE USING '*****' --- 
+
  ________      ________      ___      ___  ________     
 |\   __  \    |\   __  \    |\  \    /  /||\_____  \    
 \ \  \|\  \   \ \  \|\ /_   \ \  \  /  / /\|____|\ /_   
  \ \  \\\  \   \ \   __  \   \ \  \/  / /       \|\  \  
   \ \  \\\  \   \ \  \|\  \   \ \    / /       __\_\  \ 
    \ \_______\   \ \_______\   \ \__/ /       |\_______\
-    \|_______|    \|_______|    \|__|/        \|_______|
-                                                        
+    \|_______|    \|_______|    \|__|/        \|_______|                                                        
                                                         
 
  OpenBarbell V3.0 - the sucessor to the succesor of the world's first open source velocity measuring device
@@ -52,7 +52,8 @@
  
 // http://www.patorjk.com/software/taag/#p=display&h=0&v=0&f=ANSI%20Shadow&t=*%20W%20A%20R%20N%20I%20N%20G%20*
  
-
+//Fix rest time to be last rest time
+//Fix go back at delete prompt
 
 #include <SPI.h>
 #include <Wire.h>
@@ -67,7 +68,7 @@
 
 
 ////////////////////////
-#define DEBUG     1
+//#define DEBUG     1
 ////////////////////////
 
 
@@ -81,28 +82,26 @@
 
 //Filter Definitions
   #define max_tick_time_allowable_init 260000
-  #define precisionCounter_start 5;
-  #define NUMFLAKES 10
+  #define precisionCounter_start 5
   #define XPOS 0
   #define YPOS 1
   #define DELTAY 2
   #define LOGO16_GLCD_HEIGHT 16 
   #define LOGO16_GLCD_WIDTH  16 
+  #define MAXVEL 10
 
 //LED Definitions
   #define NUM_LEDS 1
   #define DATA_PIN 2
-  #define LOW_POWER 5
-  #define BRIGHTNESS 25
+  #define LOW_POWER 10
+  #define BRIGHTNESS 30
   enum color {RED, GREEN, BLK, WHT};
-                                                         
+                                                       
 
-
-
-/***********START DEVICE SPECIFIC INFO ***************/
-  const char *device_name = "OB 9999";
-  const long ticLength = 2667;	//AUTO GENERATED
-  const int unit_number = 9999;
+/***********START DEVICE SPECIFIC INFO ***************/                                 
+  const char *device_name = "OB 1234";
+  const long ticLength = 2667;	
+  const int unit_number = 1234;
   color COLOR = GREEN;
 /***********END DEVICE SPECIFIC INFO ***************/
 
@@ -125,7 +124,7 @@
 
  //LED Setup
   CRGB leds[1];                       
-  int r,g,b,LVL=BRIGHTNESS;
+  byte r,g,b,LVL=BRIGHTNESS;
 
 //Pin Definitions
   const int pin_buttonRight =  0;
@@ -138,13 +137,14 @@
   uint16_t charge = 50;
   const unsigned long batteryCheckTime = 10000000;     //The amount of time between battery checks. 10 sec
   volatile int state = LOW;
-  /*state flips on startup, so we need to put the temp value at HIGH so we don't run through the 
-  code one time at startup before getting an actual tic reading*/
+        /*state flips on startup, so we need to put the temp value at HIGH so we don't run through the 
+        code one time at startup before getting an actual tic reading*/
   volatile int currentStateTemp = HIGH;
   volatile bool goingUpward = 0;
   volatile bool isGoingUpwardLast = 0;
   long avgVelocity = 0;
   unsigned long starttime = 0;
+  bool overrun = false;
   bool isFlipped = false;
   bool flipPowerOlyScreen = false; //0 = Power screen, 1 = Oly screen
   bool sendData = false;
@@ -185,10 +185,11 @@
   uint16_t restTime = 0;
 
 //Tick Counter Initialization
-  const int myDTCounter_size = 1100; //1200 Dts will give 1200*~2.68 mm = 3.2 m = 10.5 ft
-  uint16_t myDTs[1] = {0};
+  const int myDTCounter_size = 1100;                      //1200 Dts will give 1200*~2.68 mm = 3.2 m = 10.5 ft
+  uint16_t myDTs[myDTCounter_size] = {0};
   uint16_t myDTCounter = 0;
-  /*uint16_t FILTER_out[myDTCounter_size] = {0};*/
+//  uint16_t FILTER_out[myDTCounter_size] = {0};          
+ 
 
 //Rep Array Initializations
   const int repArrayCount=100;
@@ -196,8 +197,8 @@
   float peakVelocity[repArrayCount] = {0.0};
   uint16_t dispArray[repArrayCount] = {0};
   float timeArray[repArrayCount] = {0.0};
-  uint8_t peakVelLocation[repArrayCount] = {0};
-  uint8_t rest[repArrayCount]={0};
+  byte peakVelLocation[repArrayCount] = {0};
+  byte rest[repArrayCount]={0};                                      
 
 
 //Button Action Setup
@@ -219,10 +220,10 @@
   bool buttonRightLongPress=0;
   bool buttonLeftLongPress=0;
   bool bothbuttonlong=0;
-  const int buttonholdtimer=10;  //delay time
+  const int buttonholdtimer=10;           //delay time
   int counter_buttonRighthold=0;
   int counter_buttonLefthold=0;
-  const int threshold_buttonhold=100; //cycles of buttonholdtimer to cross threshold
+  const int threshold_buttonhold=100;     //cycles of buttonholdtimer to cross threshold
   bool accomplishedDoubleHold = false;
 bool accomplishedSingleHold = false;
 
@@ -237,13 +238,14 @@ bool accomplishedSingleHold = false;
   static unsigned long last_tic_time = 0;
 
 //Start Message
-  float startMessage[1] = {-1234.0};
+  float startMessage[1] = {-3456.0};
 
 //Moving Average Variables	
 	int Filtration_Output = 1;	
 	const int moving_average_size = 16;
 	int moving_average_offset = 3;
 	unsigned long moving_average_holder = 0;
+  unsigned long peakAccel = 1000;
 	unsigned long moving_average_vector[moving_average_size] = {15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000};
 	float one_over_moving_average_size = 1/(float)moving_average_size;		
 	float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
@@ -276,10 +278,10 @@ bool accomplishedSingleHold = false;
 void setup() {  
 
 //LED Color Configuration
-  if (COLOR == RED){ r = 1; g = 0; b = 0;}
-  else if (COLOR == GREEN){ r = 0; g = 1; b = 0;}
-  else if (COLOR == BLK){ r = 1; g = 0; b = 1;}
-  else { r = 1; g = 1; b = 1;}
+  if (COLOR == RED){ r = 5; g = 0; b = 0;}
+  else if (COLOR == GREEN){ r = 0; g = 5; b = 0;}
+  else if (COLOR == BLK){ r = 5; g = 0; b = 5;}
+  else { r = 5; g = 5; b = 5;}
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, 1);
 
 //RFDuino Settings
@@ -295,6 +297,7 @@ void setup() {
 //Pin Configuration
   pinMode(pin_buttonRight, INPUT_PULLDOWN); 
   pinMode(pin_buttonLeft, INPUT_PULLDOWN); 
+  //pinMode(DATA_PIN, INPUT_PULLDOWN); 
   pinMode(pin_encoder_tach, INPUT); 
   pinMode(pin_encoder_dir, INPUT); 
 
@@ -321,6 +324,9 @@ void setup() {
   display.print(CODE_VERSION);
   display.display();
 
+  leds[0].setRGB( 0, 0, 0);
+  FastLED.show();
+
 //LED Boot Animation
   #ifndef DEBUG
   int R,G,B;
@@ -329,7 +335,7 @@ void setup() {
       R=5+.95*cubicwave8(foo);
       G=5+.95*cubicwave8(foo/2);
       B=5+.95*cubicwave8(foo/3);
-      leds[0].setRGB( R/4, G/4, B/4);
+      leds[0].setRGB( R/8, G/8, B/8);
       FastLED.show();
       delay(1);
     }
@@ -337,13 +343,14 @@ void setup() {
     leds[0].setRGB( 0, 0, 0);
     FastLED.show();
    
-//Initial Charge Check
+//Initial Charge Check                                                      //Low brightness addition       *****
   charge = fuelGauge.stateOfCharge();
 	if(charge>100){
 		charge=100;
 	} else if (charge<=0){
 		charge=1;
 	}
+ 
 }
 
 
@@ -355,12 +362,12 @@ void setup() {
 
 void loop() {
   
-  directionCalc();                              // 4. directionCalc()  
-  calcRep(goingUpward, state);                  // 4. directionCalc()  
-  buttonStateCalc();                            // 4. directionCalc()  
-  minuteTimer();                                // 4. directionCalc()  
-  displayOffTimer();                            // 4. directionCalc()         
-  LEDBlink();                                   // 4. directionCalc()  
+  directionCalc();                              // 4. Direction Flag   
+  calcRep(goingUpward, state);                  // 13. Rep Calculation Algorithm    
+  buttonStateCalc();                            // 14. Button Press State Configuration )  
+  minuteTimer();                                // 7. Minute Timer  
+  displayOffTimer();                            // 9. Display Timeout         
+  LEDBlink();                                   // 8. LED Updater   
   
 }
 
@@ -372,11 +379,11 @@ void loop() {
 
 void directionCalc() {
 
-	flippedDirection = digitalRead(pin_encoder_dir);    //define flipped direction (direction when you use your device upside-down)
+	flippedDirection = digitalRead(pin_encoder_dir);                     //define flipped direction (direction when you use your device upside-down)
 	normalDirection = (!initialized)?(0):(!flippedDirection);
-     //normal direction is usually directly read from the encoder, but the encoder initializes giving us the 'up'
-     //direction (pin value zero). We need the intial reading to tell us 'down', because that's what it always is
-     //when the string is retracted into the device. So if we haven't read any tics yet, set normalDirection to zero
+                                                                       //normal direction is usually directly read from the encoder, but the encoder initializes giving us the 'up'
+                                                                       //direction (pin value zero). We need the intial reading to tell us 'down', because that's what it always is
+                                                                       //when the string is retracted into the device. So if we haven't read any tics yet, set normalDirection to zero
 	goingUpward = (isFlipped)?(flippedDirection):(normalDirection);
  
 }
@@ -447,21 +454,21 @@ void olyPowerMode(){
 }
 
 //-------------------------------------------------------------------------
-//////////                7. Minute Timer                ////////////
+//////////                  7. Minute Timer                    ////////////
 //-------------------------------------------------------------------------
-//     Tracks battery charge and rest time and updates display     //
+//        Tracks battery charge and rest time and updates display        //
 //-------------------------------------------------------------------------
 
-void minuteTimer(){
+void minuteTimer(){                             //Update minute timer so that display updates when rest at a minunte    *****
   
-  if(((millis()-minTimer)%oneMinute) < 20){   //Every minute (since last rep) with .02s accuracy 
+  if(((millis()-minTimer)%oneMinute) < 20){     //Every minute (since last rep) with .02s accuracy 
   
-  	if((millis()-minTimer2)>30){              //If this function has been called within this minute, don't call it again  
+  	if((millis()-minTimer2)>30){                //If this function has been called within this minute, don't call it again  
       	
   	  minTimer2 = millis();
-  	  restTime++;                             //Rest time accumulates 
-  	  rest[repDisplay] = restTime;            //Rest time recorded for current rep
-  	  charge = fuelGauge.stateOfCharge();     //Check battery status
+  	  restTime++;                               //Rest time accumulates 
+  	                                            //Rest time recorded for current rep
+  	  charge = fuelGauge.stateOfCharge();       //Check battery status
     	  if(charge>100){
     		charge=100;
     	  } 
@@ -486,9 +493,9 @@ void minuteTimer(){
 }
 
 //-------------------------------------------------------------------------
-//////////                8. LED Updater                     ////////////
+//////////                8. LED Updater                       ////////////
 //-------------------------------------------------------------------------
-// Function to blink LED every XX seconds, if there's nothing going on //
+// Function to blink LED every XX seconds, if there's nothing going on   //
 //-------------------------------------------------------------------------
 
 void LEDBlink(){    
@@ -498,7 +505,7 @@ void LEDBlink(){
 	  twoSecTimer2 = millis();
 	  leds[0].setRGB( LVL*r, LVL*g, LVL*b);
     FastLED.show();
-	  RFduino_ULPDelay(20);
+	  RFduino_ULPDelay(20);                                       
     leds[0].setRGB( 0, 0, 0);
     FastLED.show();
 	}
@@ -546,18 +553,18 @@ void initializeBluetooth(){
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onDisconnect(){
-  if (COLOR == RED){ r = 1; g = 0; b = 0;}
-  else if (COLOR == GREEN){ r = 0; g = 1; b = 0;}
-  else if (COLOR == BLK){ r = 1; g = 0; b = 1;}
-  else { r = 1; g = 1; b = 1;}
+  if (COLOR == RED){ r = 5; g = 0; b = 0;}
+  else if (COLOR == GREEN){ r = 0; g = 5; b = 0;}
+  else if (COLOR == BLK){ r = 5; g = 0; b = 5;}
+  else { r = 5; g = 5; b = 5;}
 }
 
 //-------------------------------------------------------------------------
-//     Throws up a splash screen on BT connect and turns LED Blue      //
+//     Throws up a splash screen on BT connect and turns LED Blue      //                   Freezes at power on if connected too early
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onConnect(){
-  r = 0; g = 0; b = 1;
+  r = 0; g = 0; b = 5;
 	display.ssd1306_command(SSD1306_DISPLAYON);
 	displayTime = millis();
 	RFduino_ULPDelay(200);
@@ -573,13 +580,13 @@ void RFduinoBLE_onConnect(){
 	display.print("Connected");
 	display.display();  
 	RFduino_ULPDelay(SECONDS(2));
-//repDisplay = repDone+1 forces the screen to update at the end of the rep array
-	repDisplay = repDone+1;
+  //repDisplay = repDone+1 forces the screen to update at the end of the rep array
+	//repDisplay = repDone+1;
 	BTRefresh = true;
 }
 
 //-------------------------------------------------------------------------
-//      Function that changes variables when requested by phone        //
+//             Changes variables when requested by phone                 //
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onReceive(char *data, int len)
@@ -647,7 +654,7 @@ void RFduinoBLE_onReceive(char *data, int len)
 			display.display();			
 		}		
 
-		if (data_holder==255){                    //Enable Data Compression
+		if (data_holder==255){                    //Disable Data Compression 
 			full_data_logging_enabled = 1;		
 			precisionCounter = 1;
 			dataCOMPRESSION_enabled =0;
@@ -665,23 +672,36 @@ void RFduinoBLE_onReceive(char *data, int len)
 		}
 	}
 	
-	if(bitRead(data[0],6)){                      //Send Configuration Status to Device
+	  if(bitRead(data[0],6)){                      //Send Configuration Status to Device
 	
-		send_single_float(precisionCounter);
-		send_single_float(ticDiffprecision);
-		send_single_float(max_tick_time_allowable);
-		send_single_float(backlightTime);
-		send_single_float(minRepThreshold);
-		send_single_float(ticLength);		
-		charge = fuelGauge.stateOfCharge();		
-		send_single_float(charge);		
-		send_single_float(unit_number);	
-	}			
+  		send_single_float(precisionCounter);
+  		send_single_float(ticDiffprecision);
+  		send_single_float(max_tick_time_allowable);
+  		send_single_float(backlightTime);
+  		send_single_float(minRepThreshold);
+  		send_single_float(ticLength);		
+  		charge = fuelGauge.stateOfCharge();		
+  		send_single_float(charge);		
+  		send_single_float(unit_number);	
+	  }	
+  
+     if(bitRead(data[0],7)){                     //Get New LED Color   
+        data_holder = (int)(data[1]);            //I.E. 255:
+        r = data_holder/50;                      //r = 255/50 = 5 
+        g = (data_holder%100)/10;                //g = 255%100/10 = 55/10 = 5
+        b = (data_holder%10);                    //b = 255%10 = 5
+        
+     } 
+     
+     if(bitRead(data[0],8)){                     //Send Current LED Color 
+        data_holder = r*50 + g*10 + b;
+        send_single_float(data_holder);       
+     }
   }
 }
 
 //-------------------------------------------------------------------------
-//              Function to send messages over Bluetooth               //
+//              Sends messages over Bluetooth               //
 //-------------------------------------------------------------------------
 
 void send_intList_charString(int *intList, int len) {
@@ -710,7 +730,7 @@ void send_floatList(float *floatList, int len) {
 } 
 
 //-------------------------------------------------------------------------
-//   Function to compress and send bulk velocity data over Bluetooth   //
+//   Function to compress and send bulk velocity data over Bluetooth     //
 //-------------------------------------------------------------------------
 
 // In order to save on transmission time the uint16s will be combined together (when possible).
@@ -784,7 +804,7 @@ void send_single_float(float singleFloat) {
 } 
 
 void send_all_data() {
-	if (sendData) {//only send data if you just finished recording a new rep
+	if (sendData) {     //only send data if you just finished recording a new rep
 	  repPerformance[0] = (float) rep;
 	  repPerformance[1] = (float) repArray[rep];
 	  repPerformance[2] = (float) dispArray[rep]; 
@@ -815,16 +835,11 @@ void systemTrayDisplay(){
 	display.setTextSize(1);
 	display.setCursor(0,0);
 	display.print("Rep#:");
-	if(repDisplay<repDone){
-		display.print(repDisplay);
-    restTime=rest[repDisplay];
-	}else {
-	  display.print(repDone);
-    restTime=rest[repDone];  
-	}
+	display.print(repDisplay);
+	
 	display.print("  ");
 	display.setCursor(55,0);
-	display.print(restTime);
+	display.print(rest[repDisplay%repArrayCount]);
 	display.print(" min");
 	display.setCursor(104,0);
 	display.print(charge);
@@ -838,139 +853,161 @@ void systemTrayDisplay(){
 //-------------------------------------------------------------------------
 
 void calcRep(bool isGoingUpward, int currentState){
-  if (currentState != currentStateTemp) { //First thing we do is make sure that you are not accessing the function unless the state has changed since the last iteration
-    long denom = 0; 	
-	  initialized = 1;                      //we consider initialization after we record our first tic.    
-    tic_time = micros();                  //Since you just found a rising edge, take down the time    
-    if (isGoingUpward){                   //increment or decrement the distance by one tic length, depending on direction -->      
-	  //displacement = counter_simplelengthbytic*ticLength;	  
-		micros_holder = micros();	  	 
+
+//-------------------------------------------------------------------------
+//                            Initial Rep                                //
+//-------------------------------------------------------------------------   
+ 
+  if (currentState != currentStateTemp) {                             //Check for change in direction (state changed in <Encoder State Interrupt, Section 15>)
     
-		if((micros_holder-tic_timestamp)>max_tick_time_allowable){
-			time_waiting = time_waiting + micros_holder-tic_timestamp;
-          // There was a bug found where it was possible to start going up but then hold a position without going down...this caused the total_time to
-          // continually increase and throw off the average velocity for the rep - to compensate for this we see how much time someone is waiting and
-          // subtract that from the total_time
-		 }
-     	  
-		tic_timestampLast2 = tic_timestampLast;
-		tic_timestampLast = tic_timestamp;
-		tic_timestamp = micros_holder;      
-		  
-		if (!isGoingUpwardLast){                // If you're going upward but you were just going downward, clear your array so you can start a fresh rep
-			memset(myDTs,0,sizeof(myDTs));
-			moving_average_holder = 0;
-			//memset(FILTER_out,0,sizeof(FILTER_out));
-			memset(moving_average_vector,0,sizeof(moving_average_vector));
-			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
-			time_waiting=0;
-			counter_simplelengthbytic=0;
-			starttime = tic_timestamp;
-			send_floatList(startMessage, 1);
-			rep += 1;
-      currentInstVel = 0;
-		  lastInstVel = 0;
-			peak_vel_at = 0;
-			minDT = 1000000;
-			myDTCounter = 0;
-		}
-		  
+	  initialized = 1;                                                  //See <Direction Flag, Section 4>
+    tic_time = micros();                                              //Take start time for this rep
+    
+
+
+//-------------------------------------------------------------------------
+//                    Going Up (Recording rep data)                      //
+//------------------------------------------------------------------------- 
+   
+    if (isGoingUpward){                                               //Check direction 
+         
+	    //displacement = counter_simplelengthbytic*ticLength;	          //increment or decrement the distance by one tic length, depending on direction --> 
+		  micros_holder = micros();	  	 
+    
+  		if((micros_holder-tic_timestamp)>max_tick_time_allowable){
+  			time_waiting = time_waiting + micros_holder-tic_timestamp;
+                                                                      // There was a bug found where it was possible to start going up but then hold a position without going down...this caused the total_time to
+                                                                      // continually increase and throw off the average velocity for the rep - to compensate for this we see how much time someone is waiting and
+                                                                      // subtract that from the total_time
+  		 }
+       	  
+  		tic_timestampLast2 = tic_timestampLast;
+  		tic_timestampLast = tic_timestamp;
+  		tic_timestamp = micros_holder;   
+      if(peakAccel > tic_timestamp - tic_timestampLast2){
+        peakAccel = tic_timestamp - tic_timestampLast2;                             
+      }
+
+//-------------------------------------------------------------------------
+//                          Starting New Rep                             //
+//-------------------------------------------------------------------------
+
+  		if (!isGoingUpwardLast){                                        // If you were just going downward clear your array so you can start a fresh rep
+      
+  			memset(myDTs,0,sizeof(myDTs));                                //Zero out tic array
+  			moving_average_holder = 0;                                    //Reset current average velocity
+  			//memset(FILTER_out,0,sizeof(FILTER_out));
+  			memset(moving_average_vector,0,sizeof(moving_average_vector));  //Reset velocity array          
+  			//memset(instVelTimestamps,0,sizeof(instVelTimestamps));
+  			time_waiting=0;                                               //Reset wait time
+  			counter_simplelengthbytic=0;                                  //Reset interrupt tic counter
+  			starttime = tic_timestamp;                                    //New rep started
+  			send_floatList(startMessage, 1);                              //Tell app new rep is starting via BT
+  			rep += 1;                                                     //Increase rep count        
+        currentInstVel = 0;                                           
+  		  lastInstVel = 0;
+  			peak_vel_at = 0;
+  			minDT = 1000000;
+  			myDTCounter = 0;                                              //Zero out position data
+  		}
+  		  
 		//keeping instantaneous velocities for our peak velocity reading
 		//instVelTimestamps[counter_lengthbyticinfunction] = (unsigned int)(tic_timestamp-tic_timestamp_last);
-		ticDiff = tic_timestamp - tic_timestamp_last;
-		tic_timestamp_last = tic_timestamp;
-		
-		//Start moving average		
-		//shift values into average at first		
-			for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){
-					moving_average_vector[shift_i]=moving_average_vector[shift_i+1];
+    
+		ticDiff = tic_timestamp - tic_timestamp_last;                     //DT for this rep
+		tic_timestamp_last = tic_timestamp;                               //Base time for next rep
+    
+  		
+//-------------------------------------------------------------------------
+//                            Moving Average                             //
+//-------------------------------------------------------------------------			                                                                                         	
+    
+			for(int shift_i=0; shift_i < (moving_average_size-1); shift_i ++){                      //Going up, shift the values back (losing the first value) so that we can put our new value on the end  
+					moving_average_vector[shift_i]=moving_average_vector[shift_i+1];                    //Improve values by loading (til end) with last recorded value
 				}
 		
-			moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;
+			moving_average_vector[moving_average_size-1] = ticDiff*one_over_moving_average_size;    //push new tic (time between encoder high) onto end of array
 			
-			if(myDTCounter>=(moving_average_size)){			
-				moving_average_holder = 0;				
-				for(int i=0; i <= (moving_average_size - 1); i++){					
-					moving_average_holder=moving_average_holder+moving_average_vector[i];
-				}
-				
-				ticDiffFiltered = moving_average_holder;
-				//end moving average
-				
-				if (ticDiffFiltered < minDT){
-					minDT=ticDiffFiltered;
-					peak_vel_at=myDTCounter;
-				}	
-			} else {
-			
-			/*
-			moving_average_holder = moving_average_holder + ticDiff;
-			
-			if(myDTCounter>1){
-				moving_average_holder=(moving_average_holder/2);
-			}
-			
-			ticDiffFiltered = moving_average_holder;
-			*/	
-				
-			ticDiffFiltered = 0;
-			}
-
-		 
-			
-			if(myDTCounter >= moving_average_size-1){
-			//precisionCounter = myDTCounter/(highPrecisionMode+1);
-				if(myDTCounter<myDTCounter_size){
-
-					
-						myDTs[myDTCounter-moving_average_size] = (uint16_t)(ticDiffFiltered/ticDiffprecision);
-					if (Filtration_Output==0){
-						myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);
-					}
-				}
-			}
-
-	  
-		myDTCounter++;
-	  
-	  
-	  
+			if(myDTCounter>=(moving_average_size)){			                                            //If moving average array is full (more than 16 tics) -->
       
+				moving_average_holder = 0;	                                                          // Zero out moving average  
+
+				for(int i=0; i <= (moving_average_size - 1); i++){					
+					moving_average_holder=moving_average_holder+moving_average_vector[i];               //Add up vector to get the average velocity
+				}
+				
+				ticDiffFiltered = moving_average_holder;                                              
+				//end moving average
+  				
+  			if (ticDiffFiltered < minDT){                                                         //if the last tic was faster than the current lowest (minDT) 
+  				minDT=ticDiffFiltered;                                                              //new minimum velocity is the current
+  				peak_vel_at=myDTCounter;                                                            //save reference to this tic (required)         
+  			}	
+  		}                                                                                         
+      
+  		else {                                                                                  
+  		
+  		/*
+  		moving_average_holder = moving_average_holder + ticDiff;
+  		
+  		if(myDTCounter>1){
+  			moving_average_holder=(moving_average_holder/2);
+  		}
+  		
+  		ticDiffFiltered = moving_average_holder;
+  		*/	  			
+  		ticDiffFiltered = 0;
+		} 		 
+  			
+  		if(myDTCounter >= moving_average_size-1){
+  		//precisionCounter = myDTCounter/(highPrecisionMode+1);
+  			if(myDTCounter<myDTCounter_size){  				
+  					myDTs[myDTCounter-moving_average_size] = (uint16_t)(ticDiffFiltered/ticDiffprecision);  //start filling tic array with average velocities
+  				if (Filtration_Output==0){
+  					myDTs[myDTCounter] = (uint16_t)(ticDiff/ticDiffprecision);                              //start filling tic array with unfiltered velocities
+  				}
+  			}
+  		}    	  
+  		myDTCounter++;                                                                                //End of GoingUp, increase encoder tic total by 1 	  
+        
     } else {
+      
       // If you're going downward, and you were just going upward, you potentially just finished a rep. 
       // Do your math, check if it fits the rep criteria, and store it in an array.
-	  if (isGoingUpwardLast && rep<=repArrayCount){
-	  displacement = counter_simplelengthbytic*ticLength;
-        if (displacement > minRepThreshold){ 
-		  total_time = (tic_timestamp - starttime) - time_waiting;
-		  peakVelocity[rep%repArrayCount] = float(ticLength)/float(minDT);
-		 
-		  dispArray[rep%repArrayCount] = displacement/1000;
-          timeArray[rep%repArrayCount] = (float)total_time/1000000;
-          //peakVelocity[rep] = float(ticLength)/float(minDT);
-          peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;
-		  repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;
-          
-		  repDone = rep;
-		  //resets 60 second rest time counter
-          minTimer = millis();
-          minTimer2 = millis();
-		  restTime = 0;
-		  counter_simplelengthbytic=0;
-		  
-		  
-		  
 
-        } else { 
+//-------------------------------------------------------------------------
+//                            Rep Calculations                           //
+//-------------------------------------------------------------------------    
+
+	  if (isGoingUpwardLast){                                                                             //Modified for overflow reps    
+    
+	  displacement = counter_simplelengthbytic*ticLength;                                                 //Total distance moved
+        if (displacement > minRepThreshold){                                                            //If distance traveled is enough to qualify as one rep
+    		  total_time = (tic_timestamp - starttime) - time_waiting;                                      //Calculate time since start
+          
+    		        peakVelocity[rep%repArrayCount] = float(ticLength)/float(minDT);		 
+  		          dispArray[rep%repArrayCount] = displacement/1000;                                                                 //Update displacement array 
+                timeArray[rep%repArrayCount] = (float)total_time/1000000;                                                         //Update time array (time per rep)
+                peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;                                               //Update log of peak velocity locations 
+    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array     
+                rest[rep%repArrayCount] = restTime;   
+                 
+    		  repDone = rep;		                                                                            //Sets global rep counter to loop rep count
+          minTimer = millis();                                                                          //resets 60 second rest time counter
+          minTimer2 = millis();
+    		  restTime = 0;
+    		  counter_simplelengthbytic=0;
+        } 
+        else {                                                                                      //Get rid of this rep (it doesn't count)
           rep -= 1;
         }
       }
 	  
-      displacement -= ticLength;
+      displacement -= ticLength;                                                                    //Subtract this amount from total distance traveled (it doesn't qualify as rep distance)
     }
       
-    isGoingUpwardLast = isGoingUpward;
-    currentStateTemp = currentState;
+    isGoingUpwardLast = isGoingUpward;                                                              //Sets globally that the last state was going upward
+    currentStateTemp = currentState;                                                                //Is this necessary?          *****
   }
 }
 
@@ -983,46 +1020,57 @@ void calcRep(bool isGoingUpward, int currentState){
 
 void buttonStateCalc(){
   
-  //Read button state once per loop
+                                                                                    //Read button state once per loop
   buttonstateL = digitalRead(pin_buttonLeft);
   buttonstateR = digitalRead(pin_buttonRight);
   
-  //update rep to be displayed to the screen if you recorded a new rep
+                                                                                     //Update rep to be displayed to the screen if you recorded a new rep
   if (repDone != repDoneLast){
-    repDisplay = repDone; 
-	//repDisplayLast and repDoneLast are reset below
-	if(!backlightFlag){
-    display.ssd1306_command(SSD1306_DISPLAYON);
-	systemTrayDisplay();
-	display.display();
-	}
+    repDisplay = repDone;
+     
+	                                                                                   //RepDisplayLast and repDoneLast are reset below
+  	if(!backlightFlag){                                                              //Turn on display if it's off
+      display.ssd1306_command(SSD1306_DISPLAYON);
+    	systemTrayDisplay();
+    	display.display();
+  	}
 	sendData = true;
   }
   
-  //register a button press on the release of the right button
-  if (buttonstateRtemp && !buttonstateR){
-    if ((backlightFlag)&&(repDisplay < (repDone + 2))){
+//-------------------------------------------------------------------------
+//                            Right Button Press                         //
+//-------------------------------------------------------------------------                                                                                       
+
+  if (buttonstateRtemp && !buttonstateR){                                           //Register a button press on the release of the right button
+    
+    if ((backlightFlag)&&(repDisplay < (repDone + 2))){                             //If the screen is on and the current displayed rep is not the last
       repDisplay += 1;
-    }else {
+    }
+    
+    else {
       display.ssd1306_command(SSD1306_DISPLAYON); 
-	  backlightFlag = 1;
-	  //systemTrayDisplay();
-	  display.display();
+  	  backlightFlag = 1;
+  	  //systemTrayDisplay();
+  	  display.display();
 	  }
-    rightHold = 0;
-    RbuttonDepressed = 0;
-	//this flag forces the double hold to execute its code for only one loop
+   
+  rightHold = 0;
+  RbuttonDepressed = 0;
+	                                                                                   //This flag forces the double hold to execute its code for only one loop
 	accomplishedDoubleHold = false;
 	accomplishedSingleHold = false;
-    displayTime = millis();
-    //bluetoothStartNextLoop = true;
-    
-  }
-  
-  //register a button press on the release of the left button 
-  if (buttonstateLtemp && !buttonstateL){
-    if ((backlightFlag)&&(repDisplay > 1)&&(repDisplay < repDone + 2)){
-      repDisplay -= 1;
+  displayTime = millis();                                                            //Starts display time-out timer
+    //bluetoothStartNextLoop = true;    
+  } 
+//-------------------------------------------------------------------------
+//                            Left Button Press                          //
+//-------------------------------------------------------------------------  
+                                                                                     
+  if (buttonstateLtemp && !buttonstateL){                                            //Register a button press on the release of the left button 
+    if ((backlightFlag)&&(repDisplay > 1)&&(repDisplay < repDone + 2)){              //If the screen is on and the current displayed rep is not the first or last
+      if(repDone<=100||(repDisplay>=repDone%repArrayCount)){     
+        repDisplay -= 1;
+      }
     } else {
       display.ssd1306_command(SSD1306_DISPLAYON); 	  
       backlightFlag = 1;
@@ -1030,183 +1078,197 @@ void buttonStateCalc(){
 	  display.display();
 	  }
     leftHold = 0;
-    LbuttonDepressed = 0;
-	//this flag forces the double hold to execute its code for only one loop
-	accomplishedDoubleHold = false;
-	accomplishedSingleHold = false;
-    displayTime = millis();
+    LbuttonDepressed = 0;	
+  	accomplishedDoubleHold = false;                                                  //This flag forces the double hold to execute its code for only one loop
+  	accomplishedSingleHold = false;
+    displayTime = millis();                                                          //Starts display time-out timer
     
   }
   
-  //set a flag if you just pressed the right button, and look at when that happened
-  if (!buttonstateRtemp && buttonstateR){
+//-------------------------------------------------------------------------
+//                              Press and Hold                           //
+//------------------------------------------------------------------------- 
+ 
+  if (!buttonstateRtemp && buttonstateR){                                            //Set a flag if you just pressed the right button and start hold timer
     rightHold = millis();
     RbuttonDepressed = 1;
   }
 
-  //set a flag if you just pressed the left button, and look at when that happened  
-  if (!buttonstateLtemp && buttonstateL){
+  if (!buttonstateLtemp && buttonstateL){                                            //Set a flag if you just pressed the left button and start hold timer
     leftHold = millis();
     LbuttonDepressed = 1;
   }
   
-  //if both buttons are depressed, enable bluetooth if over 5 seconds
-  if (LbuttonDepressed && RbuttonDepressed){
+  if (LbuttonDepressed && RbuttonDepressed){                                         //if both buttons are depressed start invert mode - Bluetooth action here?     ***** 
     if (((millis() - rightHold) > bothHoldActionTime)&&((millis() - leftHold) > bothHoldActionTime)){
       if (!accomplishedDoubleHold){
         invertMode();
       }
     }
-  } else if (LbuttonDepressed || RbuttonDepressed){
+  } else if (LbuttonDepressed || RbuttonDepressed){                                  //fixes a bug where in certain situations the left button will keep the switching screens from clearing
 		if (((millis() - rightHold) > singleHoldActionTime)&&((millis() - leftHold) > singleHoldActionTime)){
 			if(!accomplishedSingleHold){
-			accomplishedSingleHold = true;
-			//fixes a bug where in certain situations the left button will keep the switching screens from clearing
-			olyPowerMode();
-			if(LbuttonDepressed){
-				repDisplay++;
-			}
-			if(RbuttonDepressed){
-				repDisplay--;
-			}
+			accomplishedSingleHold = true;                                                 
+  			
+  			olyPowerMode();                                                              //Start olympic mode
+  			if(LbuttonDepressed){
+  				repDisplay++;                                                              //Redundant code to increment reps if missed above?          *****
+  			}
+  			if(RbuttonDepressed){
+  				repDisplay--;
+  			}
 			}
 		}
   }
+//-------------------------------------------------------------------------
+//                              Display Change                           //
+//------------------------------------------------------------------------- 
 
-  if ((repDisplay != repDisplayLast)||(repDone != repDoneLast)){  
-    // if the displayed rep changes, keep the time so we know when to dim the backlight
+  if ((repDisplay != repDisplayLast)||(repDone != repDoneLast)){                     // if the displayed rep changes, keep the time so we know when to dim the backlight
+    
     displayTime = millis();
     // make sure we can see the new rep
     display.ssd1306_command(SSD1306_DISPLAYON);
     backlightFlag = 1;
-    
-    if (repDisplay == (repDone + 1)){
-		//This 'if' statement keeps you from going from "Begin Set" back to "Delete Past Set?"
-		if((repDisplayLast < (repDone + 1))||BTRefresh){
-		  BTRefresh = false;
-		  display.clearDisplay(); 
-		  systemTrayDisplay();
-		  //display.setTextSize(1);
-	      //display.setCursor(0,0);
-		  //display.print("Rep#:");
-		  //display.print(repDisplay - 1);
-		  //display.print("  ");
-		  display.setTextSize(2);
-		  display.setTextColor(WHITE);
-		  display.setCursor(0,9);
-		  display.println("Delete");
-		  display.println("Past Set?");
-		  display.setTextSize(1);
-		  display.setCursor(0,40);
-		  display.println("R Button-Delete Set");
-		  display.println("L Button-Go Back");
-		  display.display();        
-		}
-    } else if (repDisplay > (repDone + 1)){
-      counter_simplelengthbytic=0; //JDLTEST
-	  //This line keeps the repDisplay value from getting too big, and causing a bug to miss the first rep (edit: might not be necessary)
-	  //repDisplay = repDone + 2;
-      
-	  //Yes, you can just say rep = goingUpward. But goingUpward can only be 0 or 1 and rep can be any integer. It just doesn't feel right.
-      rep = (goingUpward)?(1):(0);
+
+//-------------------------------------------------------------------------
+//                              Past Set Move                            //
+//------------------------------------------------------------------------- 
+
+    if (repDisplay == (repDone + 1)){                                                //This 'if' statement keeps you from going from "Begin Set" back to "Delete Past Set?"
+		
+  		if((repDisplayLast < (repDone + 1))||BTRefresh){
+  		  BTRefresh = false;
+  		  display.clearDisplay(); 
+  		  systemTrayDisplay();
+  		  //display.setTextSize(1);
+  	      //display.setCursor(0,0);
+  		  //display.print("Rep#:");
+  		  //display.print(repDisplay - 1);
+  		  //display.print("  ");
+  		  display.setTextSize(2);
+  		  display.setTextColor(WHITE);
+  		  display.setCursor(0,9);
+  		  display.println("Delete");
+  		  display.println("Past Set?");
+  		  display.setTextSize(1);
+  		  display.setCursor(0,40);
+  		  display.println("R Button-Delete Set");
+  		  display.println("L Button-Go Back");
+  		  display.display();        
+  		}
+    } 
+    else if (repDisplay > (repDone + 1)){                                            //This line keeps the repDisplay value from getting too big, and causing a bug to miss the first rep (edit: might not be necessary)  *****
+      counter_simplelengthbytic=0; //JDLTEST	  
+	    //repDisplay = repDone + 2;  
+      rep = (goingUpward)?(1):(0);                                                   
       repDone = 0;
       repDoneLast = 0;
 	  
-	  display.clearDisplay(); 
+	    display.clearDisplay(); 
       display.setTextSize(2);
       display.setTextColor(WHITE,BLACK);
       display.setCursor(0,15);
       display.print("Begin Set!");
-	  systemTrayDisplay();
-	  display.setTextSize(1);
-	  display.setCursor(0,0);
-	  display.print("Rep#:1  ");
+	    systemTrayDisplay();
+	    display.setTextSize(1);
+	    display.setCursor(0,0);
+	    display.print("Rep#:1  ");
       display.display(); 
-	  RFduino_ULPDelay(1);
+	    RFduino_ULPDelay(1);
 	  
       memset(repArray,0,sizeof(repArray));
       memset(myDTs,0,sizeof(myDTs));
       memset(dispArray,0,sizeof(dispArray));
       memset(timeArray,0,sizeof(timeArray));
       memset(peakVelocity,0,sizeof(peakVelocity));
-	  //FOR TESTING
-	  //memset(FILTER_out,0,sizeof(FILTER_out));
-	  memset(moving_average_vector,0,sizeof(moving_average_vector));
-		moving_average_holder = 0;
-	  
+	    //FOR TESTING
+	    //memset(FILTER_out,0,sizeof(FILTER_out));
+	    memset(moving_average_vector,0,sizeof(moving_average_vector));
+		  moving_average_holder = 0;
       //memset(instVelTimestamps,0,sizeof(instVelTimestamps));
       myDTCounter = 0;
-    } else {
-		if(!flipPowerOlyScreen){
-		  display.clearDisplay();
-		  display.setTextSize(1);
-		  display.setTextColor(WHITE,BLACK);
-		  display.setCursor(0,9);
-		  display.print("Avg Vel:");
-		  display.setTextSize(3);
-		  display.setTextColor(WHITE,BLACK);
-		  display.setCursor(0,19);
-		  display.print(repArray[repDisplay%repArrayCount]); 
-		  display.setTextSize(1);
-		  display.print("m/s");
-		  display.setCursor(0,42);
-		  display.print("Peak Vel:");
-		  display.setCursor(0,51);
-		  if(peakVelocity[repDisplay] > 10){
-			display.print("MAX");
-		  }else {
-			display.print(peakVelocity[repDisplay%repArrayCount]);
-		    display.print("m/s");
-		  }
-		  //display.print(myDTs[10]);
-		  //display.print(myDTCounter/2);
-
-		  display.setCursor(82,42);
-		  display.print("ROM:");
-		  display.setCursor(82,51);
-		  display.print(dispArray[repDisplay%repArrayCount]);
-		  display.print("mm");
-
+    } 
+//-------------------------------------------------------------------------
+//                    Rep Information Display Logic                      //
+//------------------------------------------------------------------------- 
+    
+    else {                                                                                  //If in standard operating mode ->
+  		if(!flipPowerOlyScreen){
+  		  display.clearDisplay();
+  		  display.setTextSize(1);
+  		  display.setTextColor(WHITE,BLACK);
+  		  display.setCursor(0,9);
+  		  display.print("Avg Vel:");
+  		  display.setTextSize(3);
+  		  display.setTextColor(WHITE,BLACK);
+  		  display.setCursor(0,19);
+  		  display.print(repArray[repDisplay%repArrayCount]); 
+  		  display.setTextSize(1);
+  		  display.print("m/s");
+  		  display.setCursor(0,42);
+  		  display.print("Peak Vel:");
+  		  display.setCursor(0,51);
+        
+  		  if(peakVelocity[repDisplay%repArrayCount] > MAXVEL){                                                  
+  			  display.print("MAX");
+  		  }
+  		  else {
+  			  display.print(peakVelocity[repDisplay%repArrayCount]);
+  		    display.print("m/s");
+  		  }
+         
+  		  //display.print(myDTs[10]);
+  		  //display.print(myDTCounter/2);  
+  		  display.setCursor(82,42);
+  		  display.print("ROM:");
+  		  display.setCursor(82,51);
+  		  display.print(dispArray[repDisplay%repArrayCount]);                                 
+  		  display.print("mm");
+  
 		  	if(testbed_readouts){
-				display.setTextSize(1);
-				display.setCursor(100,12);
-				display.print(peak_vel_at);
-
-				display.setCursor(100,22);
-				display.print(myDTCounter);
-			}
-	    } else {
-		  display.clearDisplay();
-		  display.setTextSize(1);
-		  display.setTextColor(WHITE,BLACK);
-		  display.setCursor(0,9);
-		  display.print("Peak Vel:");
-		  display.setTextSize(3);
-		  display.setTextColor(WHITE,BLACK);
-		  display.setCursor(0,19);
-		  if(peakVelocity[repDisplay%repArrayCount] > 10){
-			display.print("MAX");
-		  }else {
-			  display.print(peakVelocity[repDisplay%repArrayCount]);
-			  display.setTextSize(1);
-			  display.print("m/s");
-		  }
-		  display.setTextSize(1);
-		  display.setCursor(0,42);
-		  display.print("Time:");
-		  display.setCursor(0,51);
-		  display.print(timeArray[repDisplay%repArrayCount]);
-		  display.print("sec");
-		  display.setTextSize(1);
-		  display.setCursor(82,42);
-		  display.print("PeakHt:");
-		  display.setCursor(82,51);
-		  display.print(peakVelLocation[repDisplay%repArrayCount]);
-		  display.print("%");
-		}
-		systemTrayDisplay();
-		display.display();      
-		send_all_data(); //moved send_all_data here so it doesn't lag the display
+  				display.setTextSize(1);
+  				display.setCursor(100,12);
+  				display.print(peak_vel_at);
+  
+  				display.setCursor(100,22);
+  				display.print(myDTCounter);
+			  }
+	     } 
+	     else {
+  		  display.clearDisplay();
+  		  display.setTextSize(1);
+  		  display.setTextColor(WHITE,BLACK);
+  		  display.setCursor(0,9);
+  		  display.print("Peak Vel:");
+  		  display.setTextSize(3);
+  		  display.setTextColor(WHITE,BLACK);
+  		  display.setCursor(0,19);
+        
+    		  if(peakVelocity[repDisplay%repArrayCount] > MAXVEL){
+    			  display.print("MAX");
+    		  }
+    		  else {
+    			  display.print(peakVelocity[repDisplay%repArrayCount]);
+    			  display.setTextSize(1);
+    			  display.print("m/s");
+    		  }
+  		  display.setTextSize(1);
+  		  display.setCursor(0,42);
+  		  display.print("Time:");
+  		  display.setCursor(0,51);
+  		  display.print(timeArray[repDisplay%repArrayCount]);
+  		  display.print("sec");
+  		  display.setTextSize(1);
+  		  display.setCursor(82,42);
+  		  display.print("PeakHt:");
+  		  display.setCursor(82,51);
+  		  display.print(peakVelLocation[repDisplay%repArrayCount]);
+  		  display.print("%");
+		    } 
+  		systemTrayDisplay();
+  		display.display();      
+  		send_all_data(); //moved send_all_data here so it doesn't lag the display
     }
     repDoneLast = repDone;
     repDisplayLast = repDisplay; 
