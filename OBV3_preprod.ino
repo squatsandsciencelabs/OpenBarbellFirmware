@@ -81,7 +81,7 @@
   Adafruit_SSD1306 display(OLED_RESET);
 
 //Filter Definitions
-  #define max_tick_time_allowable_init 260000
+  #define max_tick_time_allowable_init 130000
   #define precisionCounter_start 5
   #define XPOS 0
   #define YPOS 1
@@ -94,19 +94,19 @@
   #define NUM_LEDS 1
   #define DATA_PIN 2
   #define LOW_POWER 1
-  #define BRIGHTNESS 35
+  #define BRIGHTNESS 20
   enum color {RED, GREEN, BLK, WHT};
                                                        
 
 /***********START DEVICE SPECIFIC INFO ***************/                                 
   const char *device_name = "OB 5555";
-  const long ticLength = 2667;	
+  const long ticLength = 2718;	
   const int unit_number = 5555;
   color COLOR = RED;
 /***********END DEVICE SPECIFIC INFO ***************/
 
 //Version Info
-  float CODE_VERSION = 9.99;
+  float CODE_VERSION = 3.01;
 
 //TestBed Section - Do Not Modify
   const bool testbed_readouts = 0;
@@ -124,7 +124,7 @@
 
  //LED Setup
   CRGB leds[1];                       
-  byte r,g,b,LVL=BRIGHTNESS;
+  byte r,g,b,LVL=BRIGHTNESS,userColor=0;
 
 //Pin Definitions
   const int pin_buttonRight =  0;
@@ -182,7 +182,8 @@
   unsigned long ticDiff = 0;
   unsigned long ticDiffFiltered = 0;
   unsigned long backlightTime = 10000;
-  unsigned long vel_last = 10000000;
+  unsigned long last_avg = 0;
+  unsigned long last_press = 0;
   uint16_t restTime = 0;
 
 //Tick Counter Initialization
@@ -192,7 +193,7 @@
 //  uint16_t FILTER_out[myDTCounter_size] = {0};          
  
 
-//Rep Array Initializations 55555
+//Rep Array Initializations 
   const int repArrayCount=100;
   float repArray[repArrayCount] = {0.0};
   float peakVelocity[repArrayCount] = {0.0};
@@ -203,6 +204,7 @@
 
 
 //Button Action Setup
+  bool doubleclick = false;
   uint16_t buttonstateR = 0; 
   uint16_t buttonstateL = 0; 
   int buttonstate = 0;  
@@ -247,7 +249,7 @@ bool accomplishedSingleHold = false;
 	int moving_average_offset = 3;
 	unsigned long moving_average_holder = 0;
   float peakAccel = 0;
-  unsigned long peakAccelHolder = 0;
+  float peakAccelHolder = 0;
 	unsigned long moving_average_vector[moving_average_size] = {15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000,15000};
 	float one_over_moving_average_size = 1/(float)moving_average_size;		
 	float average_tick_length = 2755.95; //((3.1419+2.37)/2)*1000 for micrometers
@@ -280,10 +282,10 @@ bool accomplishedSingleHold = false;
 void setup() {  
 
 //LED Color Configuration
-  if (COLOR == RED){ r = 5; g = 0; b = 0;}
-  else if (COLOR == GREEN){ r = 0; g = 5; b = 0;}
-  else if (COLOR == BLK){ r = 5; g = 0; b = 5;}
-  else { r = 5; g = 5; b = 5;}
+  if (COLOR == RED){ r = 5; g = 0; b = 0;userColor = 200;}
+  else if (COLOR == GREEN){ r = 0; g = 5; b = 0;userColor = 50;}
+  else if (COLOR == BLK){ r = 5; g = 0; b = 5;userColor = 205;}
+  else { r = 5; g = 5; b = 5;userColor = 255;}
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, 1);
 
 //RFDuino Settings
@@ -344,6 +346,8 @@ void setup() {
    #endif
     leds[0].setRGB( 0, 0, 0);
     FastLED.show();
+//Initialize Rest Time
+   rest[1] = 0;
    
 //Initial Charge Check                                                      //Low brightness addition       *****
   charge = fuelGauge.stateOfCharge();
@@ -558,10 +562,17 @@ void initializeBluetooth(){
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onDisconnect(){
-  if (COLOR == RED){ r = 5; g = 0; b = 0;}
-  else if (COLOR == GREEN){ r = 0; g = 5; b = 0;}
-  else if (COLOR == BLK){ r = 5; g = 0; b = 5;}
-  else { r = 5; g = 5; b = 5;}
+  if(userColor>0){
+    r = userColor/50;                      //r = 255/50 = 5 
+    g = (userColor%100)/10;                //g = 255%100/10 = 55/10 = 5
+    b = (userColor%10);                    //b = 255%10 = 5
+  }
+  else{
+    if (COLOR == RED){ r = 5; g = 0; b = 0;}
+    else if (COLOR == GREEN){ r = 0; g = 5; b = 0;}
+    else if (COLOR == BLK){ r = 5; g = 0; b = 5;}
+    else { r = 5; g = 5; b = 5;}
+  }
 }
 
 //-------------------------------------------------------------------------
@@ -692,6 +703,7 @@ void RFduinoBLE_onReceive(char *data, int len)
   
      if(bitRead(data[0],7)){                     //Get New LED Color   
         data_holder = (int)(data[1]);            //I.E. 255:
+        userColor = data_holder;                 //Store color
         r = data_holder/50;                      //r = 255/50 = 5 
         g = (data_holder%100)/10;                //g = 255%100/10 = 55/10 = 5
         b = (data_holder%10);                    //b = 255%10 = 5
@@ -811,15 +823,15 @@ void send_single_float(float singleFloat) {
 void send_all_data() {
 	if (sendData) {       
 	  repPerformance[0] = (float) rep;                                  //Rep #
-	  repPerformance[1] = (float) repArray[rep];                        //Avg Velocity (m/s)      
-	  repPerformance[2] = (float) dispArray[rep];                       //Range of Motion (mm)
-	  repPerformance[3] = (float) peakVelocity[rep];                    //Peak Velocity (m/s)
-	  repPerformance[4] = (float) peakVelLocation[rep];                 //Peak Velocity Location (%)
+	  repPerformance[1] = (float) repArray[rep%repArrayCount];          //Avg Velocity (m/s)      
+	  repPerformance[2] = (float) dispArray[rep%repArrayCount];         //Range of Motion (mm)
+	  repPerformance[3] = (float) peakVelocity[rep%repArrayCount];      //Peak Velocity (m/s)
+	  repPerformance[4] = (float) peakVelLocation[rep%repArrayCount];   //Peak Velocity Location (%)
 	  send_floatList(repPerformance, 5);
-    send_single_float(peakAccel/1000000);                                     //Peak Acceleration (m/s^2)
+    send_single_float(peakAccel);                                     //Peak Acceleration (m/s^2)
 	  
 	  //Start OBV3 Extra Data
-    send_single_float(timeArray[rep]*100000);                         //Duration of Rep (microseconds)
+    send_single_float(timeArray[rep%repArrayCount]*1000000);                         //Duration of Rep (microseconds)
     send_single_float(restTime);                                      //Time between Reps (minutes)
     send_single_float(tic_timestamp);                                 //Timesatamp of Rep Completion (microseconds)
     send_single_float(time_waiting);                                  //Timestamp of time "waiting" in rep (microseconds)
@@ -832,7 +844,7 @@ void send_all_data() {
     //Device Info
     send_single_float(CODE_VERSION);                                  //Code Version 
     send_single_float(unit_number);                                   //Unit Number
-    send_single_float((r*100)+(g*10+b));                               //LED Color (RGB)
+    send_single_float(userColor);                                     //LED Color (RGB)
     send_single_float(BRIGHTNESS);                                    //Brightness (%)
     send_single_float(LOW_POWER);                                     //Low Power Brightness (%)
 
@@ -964,14 +976,15 @@ void calcRep(bool isGoingUpward, int currentState){
 					moving_average_holder=moving_average_holder+moving_average_vector[i];               //Add up vector to get the average velocity
 				}
 
-        if(moving_average_holder<vel_last){
-          peakAccelHolder = ((ticLength/vel_last)-(ticLength/moving_average_holder))/(moving_average_holder+vel_last);
+        if(last_avg>moving_average_holder){
+          peakAccelHolder = (((float)ticLength/(float)moving_average_holder)-((float)ticLength/(float)last_avg))/((float)moving_average_holder/1000000); //Calculate peak acceleration --> dV/dT
            
         }
         else{
-          peakAccelHolder = 0;
+          //peakAccelHolder = 0;
         }
-        vel_last = moving_average_holder;
+        
+        last_avg = moving_average_holder;
       
        if(peakAccelHolder>peakAccel){
           peakAccel = peakAccelHolder;
@@ -1031,8 +1044,11 @@ void calcRep(bool isGoingUpward, int currentState){
   		          dispArray[rep%repArrayCount] = displacement/1000;                                                                 //Update displacement array 
                 timeArray[rep%repArrayCount] = (float)total_time/1000000;                                                         //Update time array (time per rep)
                 peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;                                               //Update log of peak velocity locations 
-    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array     
-                rest[rep%repArrayCount] = restTime;   
+    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array 
+                if(rep>1)    
+                rest[rep%repArrayCount-1] = restTime;  
+                
+                 
                  
     		  repDone = rep;		                                                                            //Sets global rep counter to loop rep count
           minTimer = millis();                                                                          //resets 60 second rest time counter
@@ -1109,6 +1125,7 @@ void buttonStateCalc(){
 //-------------------------------------------------------------------------  
                                                                                      
   if (buttonstateLtemp && !buttonstateL){                                            //Register a button press on the release of the left button 
+        
     if ((backlightFlag)&&(repDisplay > 1)&&(repDisplay < repDone + 2)){              //If the screen is on and the current displayed rep is not the first or last
       if(repDone<=100||(repDisplay>=repDone%repArrayCount)){     
         repDisplay -= 1;
@@ -1141,7 +1158,8 @@ void buttonStateCalc(){
     LbuttonDepressed = 1;
   }
   
-  if (LbuttonDepressed && RbuttonDepressed){                                         //if both buttons are depressed start invert mode - Bluetooth action here?     ***** 
+  if (LbuttonDepressed && RbuttonDepressed){                                         //if both buttons are depressed start invert mode 
+    //doubleclick=!doubleclick;                                                      //function to enable peak acceleration in olympic mode
     if (((millis() - rightHold) > bothHoldActionTime)&&((millis() - leftHold) > bothHoldActionTime)){
       if (!accomplishedDoubleHold){
         invertMode();
@@ -1182,12 +1200,12 @@ void buttonStateCalc(){
   		if((repDisplayLast < (repDone + 1))||BTRefresh){
   		  BTRefresh = false;
   		  display.clearDisplay(); 
-  		  systemTrayDisplay();
-  		  //display.setTextSize(1);
-  	      //display.setCursor(0,0);
-  		  //display.print("Rep#:");
-  		  //display.print(repDisplay - 1);
-  		  //display.print("  ");
+  		  systemTrayDisplay();        
+  		  display.setTextSize(1);
+  	    display.setCursor(0,0);
+  		  display.print("Rep#:");
+  		  display.print(repDisplay - 1);
+  		  display.print("  ");
   		  display.setTextSize(2);
   		  display.setTextColor(WHITE);
   		  display.setCursor(0,9);
@@ -1282,19 +1300,32 @@ void buttonStateCalc(){
   		  display.setTextSize(1);
   		  display.setTextColor(WHITE,BLACK);
   		  display.setCursor(0,9);
+       
+        if(doubleclick)
   		  display.print("Peak Accel:");
+        else
+        display.print("Peak Vel:");
+        
   		  display.setTextSize(3);
   		  display.setTextColor(WHITE,BLACK);
   		  display.setCursor(0,19);
-        /*
+
+        if(doubleclick){
+          display.print(peakAccel);
+          display.setTextSize(1);
+          display.print("m/s^2");
+        }
+        else{   
     		  if(peakVelocity[repDisplay%repArrayCount] > MAXVEL){
     			  display.print("MAX");
     		  }
-    		  else {*/
-    			  display.print(peakAccel/1000000);
-    			  display.setTextSize(1);
-    			  display.print("m/s^2");
-    		  //}
+    		  else {         
+    			  display.print(peakVelocity[repDisplay%repArrayCount]);
+            display.setTextSize(1);
+            display.print("m/s");          
+    		  }
+        }
+    			  
   		  display.setTextSize(1);
   		  display.setCursor(0,42);
   		  display.print("Time:");
