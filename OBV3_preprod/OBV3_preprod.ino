@@ -262,6 +262,7 @@ bool accomplishedSingleHold = false;
   FilterOnePole filterOneLowpass( LOWPASS, testFrequency );
   uint16_t precisionCounter = precisionCounter_start;  
   volatile unsigned int counter_simplelengthbytic=0;		//This is a simple counter that is called to count how many times we enter the interrupt
+  
   unsigned long micros_holder=0;	//This is a temporary holder used so we don't have to keep calling micros()
   unsigned long  max_tick_time_allowable = max_tick_time_allowable_init;		// max_tick_time_allowable is a variable that is used to determine if the the rep "started" but really it's just pausing - see above for math used to derive number6
   unsigned long time_waiting = 0; // Once we determine that the user is pausing during a rep we start to increment a waiting timer to subtract from the overall time
@@ -514,7 +515,7 @@ void LEDBlink(){
 	  twoSecTimer2 = millis();
 	  leds[0].setRGB( LVL*r, LVL*g, LVL*b);
     FastLED.show();
-	  RFduino_ULPDelay(20);                                       
+    RFduino_ULPDelay(20);
     leds[0].setRGB( 0, 0, 0);
     FastLED.show();
 	}
@@ -1113,7 +1114,7 @@ void buttonStateCalc(){
   if (buttonstateLtemp && !buttonstateL){                                            //Register a button press on the release of the left button 
         
     if ((backlightFlag)&&(repDisplay > 1)&&(repDisplay < repDone + 2)){              //If the screen is on and the current displayed rep is not the first or last
-      if(repDone<=100||(repDisplay>=repDone%repArrayCount)){     
+      if(repDone<=100||(repDisplay-1>repDone%repArrayCount)){     
         repDisplay -= 1;
       }
     } else {
