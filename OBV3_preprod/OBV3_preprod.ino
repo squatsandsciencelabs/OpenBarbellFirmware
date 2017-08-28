@@ -261,7 +261,7 @@ bool accomplishedSingleHold = false;
   float testFrequency = 10;
   FilterOnePole filterOneLowpass( LOWPASS, testFrequency );
   uint16_t precisionCounter = precisionCounter_start;  
-  unsigned int counter_simplelengthbytic=0;		//This is a simple counter that is called to count how many times we enter the interrupt
+  volatile unsigned int counter_simplelengthbytic=0;		//This is a simple counter that is called to count how many times we enter the interrupt
   unsigned long micros_holder=0;	//This is a temporary holder used so we don't have to keep calling micros()
   unsigned long  max_tick_time_allowable = max_tick_time_allowable_init;		// max_tick_time_allowable is a variable that is used to determine if the the rep "started" but really it's just pausing - see above for math used to derive number6
   unsigned long time_waiting = 0; // Once we determine that the user is pausing during a rep we start to increment a waiting timer to subtract from the overall time
@@ -372,14 +372,12 @@ void setup() {
 //-------------------------------------------------------------------------
 
 void loop() {
-  
   directionCalc();                              // 4. Direction Flag   
   calcRep(goingUpward, state);                  // 13. Rep Calculation Algorithm    
   buttonStateCalc();                            // 14. Button Press State Configuration )  
   minuteTimer();                                // 7. Minute Timer  
   displayOffTimer();                            // 9. Display Timeout         
-  LEDBlink();                                   // 8. LED Updater   
-  
+  LEDBlink();                                   // 8. LED Updater
 }
 
 //-------------------------------------------------------------------------
@@ -584,7 +582,6 @@ void RFduinoBLE_onDisconnect(){
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onConnect(){
-  RFduino_ULPDelay(200);
   BTisconnected = 1;
   r = 0; g = 0; b = 5;
 	BTRefresh = true;
