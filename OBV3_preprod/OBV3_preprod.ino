@@ -121,6 +121,7 @@
   boolean bluetoothStartNextLoop = false;
   float repPerformance[] = {0.0, 1.0,2.0,3.0,4.0,5.0};
   bool BTRefresh = false;
+  bool BTisconnected = 0;
 
  //LED Setup
   CRGB leds[1];                       
@@ -171,6 +172,7 @@
   unsigned long tic_timestampLast2 = 0;
   unsigned long tic_timestamp_last = 0;
   unsigned long minDT = 1000000;
+  unsigned long blink_override_threshold = 5000000;
   unsigned long total_time = 0;
   unsigned long displayTime = 0;
   unsigned long batteryTime = 0;
@@ -509,7 +511,7 @@ void minuteTimer(){                             //Update minute timer so that di
 
 void LEDBlink(){    
   
-  if(((millis()%twoSec) < 20)&&((!goingUpward))){    //If it's been 2n seconds and the encoder's not in use 
+  if(((millis()%twoSec) < 20)&&((!goingUpward)||(time_waiting > blink_override_threshold))){    //If it's been 2n seconds and the encoder's not in use 
 	if((millis()-twoSecTimer2)>30){                               //Makes sure the loop trips only once
 	  twoSecTimer2 = millis();
 	  leds[0].setRGB( LVL*r, LVL*g, LVL*b);
@@ -546,7 +548,8 @@ void initializeBluetooth(){
   
   bluetoothOn = true;
   RFduinoBLE.begin();
-  RFduino_ULPDelay(0);
+  RFduinoBLE.advertisementInterval = 100; 
+  RFduino_ULPDelay(200);
 	
 //Starting Bluetooth resets timers:
 	displayTime = millis();
@@ -562,6 +565,7 @@ void initializeBluetooth(){
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onDisconnect(){
+  BTisconnected = 0;
   if(userColor>0){
     r = userColor/50;                      //r = 255/50 = 5 
     g = (userColor%100)/10;                //g = 255%100/10 = 55/10 = 5
@@ -580,24 +584,9 @@ void RFduinoBLE_onDisconnect(){
 //-------------------------------------------------------------------------
 
 void RFduinoBLE_onConnect(){
+  RFduino_ULPDelay(200);
+  BTisconnected = 1;
   r = 0; g = 0; b = 5;
-	display.ssd1306_command(SSD1306_DISPLAYON);
-	displayTime = millis();
-	RFduino_ULPDelay(200);
-	display.clearDisplay();
-	display.setTextSize(2);
-  display.setCursor(10,0);
-	display.print("Unit ");
-	display.print(unit_number);
-	display.setTextSize(2);	
-	display.setCursor(10,22);
-	display.print("Bluetooth");	
-	display.setCursor(10,42);
-	display.print("Connected");
-	display.display();  
-	RFduino_ULPDelay(SECONDS(2));
-  //repDisplay = repDone+1 forces the screen to update at the end of the rep array
-	//repDisplay = repDone+1;
 	BTRefresh = true;
 }
 
@@ -762,15 +751,15 @@ void send_floatList(float *floatList, int len) {
 void send_float_from_intList(uint16_t *intList, uint16_t len) { 
 			
 			display.setTextSize(1);
-			display.setCursor(100,22);
+			display.setCursor(95,22);
 			display.print(")");
 			
 			display.setTextSize(2);
-			display.setCursor(107,18);
+			display.setCursor(102,18);
 			display.print(")");
 			
 			display.setTextSize(3);
-			display.setCursor(115,16);
+			display.setCursor(109,16);
 			display.print(")");
 			
 			display.display();
@@ -798,15 +787,15 @@ void send_float_from_intList(uint16_t *intList, uint16_t len) {
   
   display.setTextSize(2);
 			display.setTextSize(1);
-			display.setCursor(100,22);
+			display.setCursor(95,22);
 			display.print(" ");
 			
 			display.setTextSize(2);
-			display.setCursor(107,18);
+			display.setCursor(102,18);
 			display.print(" ");
 			
 			display.setTextSize(3);
-			display.setCursor(115,16);
+			display.setCursor(109,16);
 			display.print(" ");
 			display.display();  
 } 
@@ -1341,7 +1330,9 @@ void buttonStateCalc(){
 		    } 
   		systemTrayDisplay();
   		display.display();      
-  		send_all_data(); //moved send_all_data here so it doesn't lag the display
+      if(BTisconnected){
+  		  send_all_data(); //moved send_all_data here so it doesn't lag the display
+      }
     }
     repDoneLast = repDone;
     repDisplayLast = repDisplay; 
