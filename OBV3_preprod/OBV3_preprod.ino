@@ -477,7 +477,7 @@ void minuteTimer(){                             //Update minute timer so that di
       	
   	  minTimer2 = millis();
   	  restTime++;                               //Rest time accumulates 
-  	                                            //Rest time recorded for current rep
+  	  rest[repDone%repArrayCount] = restTime;     //Rest time recorded for current rep
   	  charge = fuelGauge.stateOfCharge();       //Check battery status
     	  if(charge>100){
     		charge=100;
@@ -492,12 +492,10 @@ void minuteTimer(){                             //Update minute timer so that di
         LVL=BRIGHTNESS;
        }  
      
-	  display.setTextColor(WHITE,BLACK);
-	  display.setTextSize(1);
-	  display.setCursor(55,0);
-	  display.print(restTime);
-	  display.print(" min");
-	  display.display();
+        if (!goingUpward) {
+            systemTrayDisplay();
+            display.display();
+        }
 	  }
   }
 }
@@ -1208,7 +1206,7 @@ void buttonStateCalc(){
     else if (repDisplay > (repDone + 1)){                                            //This line keeps the repDisplay value from getting too big, and causing a bug to miss the first rep (edit: might not be necessary)  *****
       counter_simplelengthbytic=0; //JDLTEST	  
 	    //repDisplay = repDone + 2;  
-      rep = (goingUpward)?(1):(0);                                                   
+      rep = (goingUpward)?(1):(0);
       repDone = 0;
       repDoneLast = 0;
 	  
