@@ -1029,9 +1029,10 @@ void calcRep(bool isGoingUpward, int currentState){
   		          dispArray[rep%repArrayCount] = displacement/1000;                                                                 //Update displacement array 
                 timeArray[rep%repArrayCount] = (float)total_time/1000000;                                                         //Update time array (time per rep)
                 peakVelLocation[rep%repArrayCount] = (peak_vel_at*100)/myDTCounter;                                               //Update log of peak velocity locations 
-    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array 
+    		        repArray[rep%repArrayCount] = ((float)(counter_simplelengthbytic*ticLength)/(float)(total_time/1000))/1000;       //Get total rep time and store in array
+                rest[rep%repArrayCount] = 0;                                                                                      //Reset rest time just in case it's reused
                 if(rep>1)    
-                rest[rep%repArrayCount-1] = restTime;  
+                    rest[rep%repArrayCount-1] = restTime;                                                                         //Set the rest time of the previous rep
                 
                  
                  
