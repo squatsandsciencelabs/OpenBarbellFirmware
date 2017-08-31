@@ -99,9 +99,9 @@
                                                        
 
 /***********START DEVICE SPECIFIC INFO ***************/                                 
-  const char *device_name = "OB 5555";
+  const char *device_name = "OB 6666";
   const long ticLength = 2718;	
-  const int unit_number = 5555;
+  const int unit_number = 6666;
   color COLOR = RED;
 /***********END DEVICE SPECIFIC INFO ***************/
 
@@ -492,7 +492,7 @@ void minuteTimer(){                             //Update minute timer so that di
         LVL=BRIGHTNESS;
        }  
      
-        if (!goingUpward) {
+        if (!goingUpward||(time_waiting > blink_override_threshold)) {
             systemTrayDisplay();
             display.display();
         }
@@ -858,11 +858,14 @@ void systemTrayDisplay(){
 	display.setTextSize(1);
 	display.setCursor(0,0);
 	display.print("Rep#:");
-	display.print(repDisplay);
-	
+	if((repDisplay<repDone)||(repDisplay==repDone)){                         //this statement keeps the 'begin set' screen from showing repDisplay, which could be more than 1
+    display.print(repDisplay);
+  }else display.print("1");
 	display.print("  ");
 	display.setCursor(55,0);
-	display.print(rest[repDisplay%repArrayCount]);
+  if((repDisplay<repDone)||(repDisplay==repDone)){                         //this statement allows the 'begin set' screen to show rest time
+    display.print(rest[repDisplay%repArrayCount]);
+  }else display.print(restTime);
 	display.print(" min");
 	display.setCursor(104,0);
 	display.print(charge);
