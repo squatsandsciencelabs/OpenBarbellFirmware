@@ -3,6 +3,10 @@
 // Jackie Swinehart
 // John Rudolf
 // Mark Gumtang
+// Reggie McCoy
+// Ronald Drago
+// Daniel Mix
+
 
 /*
 
@@ -44,7 +48,7 @@
   
  Created 2017
  Jordan Berke
- Jonathan Lenoff
+ John Lin
  Elliot Noma
  Nick "The Hammer" Johnson
  Squats & Science Labs, LLC
@@ -99,9 +103,9 @@
                                                        
 
 /***********START DEVICE SPECIFIC INFO ***************/                                 
-  const char *device_name = "OB 6666";
+  const char *device_name = "OB 3000";
   const long ticLength = 2718;	
-  const int unit_number = 6666;
+  const int unit_number = 3000;
   color COLOR = RED;
 /***********END DEVICE SPECIFIC INFO ***************/
 
@@ -492,7 +496,7 @@ void minuteTimer(){                             //Update minute timer so that di
         LVL=BRIGHTNESS;
        }  
      
-        if (!goingUpward||(time_waiting > blink_override_threshold)) {
+        if (!goingUpward||((micros()-tic_timestamp) > blink_override_threshold)) {
             systemTrayDisplay();
             display.display();
         }
@@ -508,7 +512,7 @@ void minuteTimer(){                             //Update minute timer so that di
 
 void LEDBlink(){    
   
-  if(((millis()%twoSec) < 20)&&((!goingUpward)||(time_waiting > blink_override_threshold))){    //If it's been 2n seconds and the encoder's not in use 
+  if(((millis()%twoSec) < 20)&&((!goingUpward)||((micros()-tic_timestamp) > blink_override_threshold))){    //If it's been 2n seconds and the encoder's not in use 
 	if((millis()-twoSecTimer2)>30){                               //Makes sure the loop trips only once
 	  twoSecTimer2 = millis();
 	  leds[0].setRGB( LVL*r, LVL*g, LVL*b);
